@@ -58,7 +58,12 @@ cd src/api && dotnet publish -c Release
 
 ### Aspire Configuration (`src/AppHost/AppHost.cs`)
 
-The frontend accesses the API through environment variables set by Aspire:
+**Azure Functions with Aspire:**
+- Uses `.AddAzureFunctionsProject<Projects.WheelOfDoom_Api>("api")` instead of `.AddProject()`
+- `.WithReference(tables)` automatically passes Azure Table Storage connection via environment variables
+- `.WaitFor(tables)` ensures storage is ready before Functions start
+
+**Frontend to API Communication:**
 - `.WithReference(api)` sets `services__api__http__0` and `services__api__https__0`
 - `.WithHttpEndpoint(env: "PORT")` tells the frontend which port to bind to
 - Frontend must listen on `0.0.0.0` (not `localhost`) to be accessible through Aspire's proxy
@@ -76,6 +81,12 @@ server: {
   }
 }
 ```
+
+**Azure Functions Integration** (`src/api/Program.cs`):
+- Uses `FunctionsApplication.CreateBuilder(args)` (not `HostBuilder`)
+- Calls `builder.AddServiceDefaults()` to integrate with Aspire
+- **Do not** include `AddApplicationInsightsTelemetryWorkerService()` - handled by ServiceDefaults
+- Connection strings come from Aspire app host configuration
 
 ### Data Flow Architecture
 
@@ -128,7 +139,7 @@ Browser autoplay policy requires user interaction before audio context starts.
 - `src/app/src/utils/api.js` - All API fetch functions (single source of truth for endpoints)
 
 ### Backend Core
-- `src/api/Program.cs` - Dependency injection setup, registers `ITableStorageService`
+- `src/api/Program.cs` - Aspire integration with `FunctionsApplication.CreateBuilder()`, ServiceDefaults, and DI
 - `src/api/Services/TableStorageService.cs` - Wraps Azure.Data.Tables SDK
 - `src/api/Functions/EntriesFunction.cs` - GET/POST entries with validation
 - `src/api/Models/SpinResult.cs` - Contains inverted timestamp logic
@@ -156,6 +167,24 @@ Browser autoplay policy requires user interaction before audio context starts.
 3. Extract user identity: `req.Headers["x-ms-client-principal-name"] ?? "anonymous"`
 4. Add corresponding frontend utility function in `src/app/src/utils/api.js`
 5. Create/update custom hook in `src/app/src/hooks/` for React state management
+
+### Modifying Azure Functions with Aspire
+**Key Pattern (from Microsoft docs):**
+```csharp
+using Microsoft.Azure.Functions.Worker.Builder;
+
+var builder = FunctionsApplication.CreateBuilder(args);
+builder.AddServiceDefaults();  // Aspire integration
+builder.ConfigureFunctionsWebApplication();
+// Register services
+builder.Build().Run();
+```
+
+**Important:**
+- Use `FunctionsApplication.CreateBuilder(args)` not `new HostBuilder()`
+- Call `AddServiceDefaults()` before `ConfigureFunctionsWebApplication()`
+- Don't add Application Insights directly - ServiceDefaults handles it
+- AppHost must use `AddAzureFunctionsProject<T>()` not `AddProject<T>()`
 
 ### Modifying Table Storage Schema
 1. Update model class in `src/api/Models/` (must implement `ITableEntity`)
@@ -217,7 +246,7 @@ No manual CORS configuration needed locally - Vite's proxy handles all `/api/*` 
 ## Technology Stack
 
 - **Frontend**: React 19.2, Vite 7.2.4, Vitest 4.0.17
-- **Backend**: .NET 8 (API), .NET 10 (Aspire), Azure Functions v4 (isolated worker)
+- **Backend**: .NET 10 (API with Aspire integration), Azure Functions v4 (isolated worker)
 - **Storage**: Azure.Data.Tables 12.11.0
 - **Orchestration**: .NET Aspire 13.1.0
 - **Testing**: xUnit (.NET), Vitest + Testing Library (React), Playwright (E2E)
