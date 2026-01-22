@@ -10,10 +10,13 @@ const __dirname = dirname(__filename)
 export default defineConfig({
   plugins: [react()],
   server: {
+    port: process.env.PORT ? parseInt(process.env.PORT) : 5173,
+    host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://localhost:7071',
+        target: process.env.services__api__http__0 || process.env.services__api__https__0 || 'http://localhost:7071',
         changeOrigin: true,
+        rewrite: (path) => path,
       },
     },
   },
