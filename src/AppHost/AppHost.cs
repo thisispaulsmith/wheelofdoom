@@ -2,7 +2,10 @@ var builder = DistributedApplication.CreateBuilder(args);
 
 // Azure Storage (uses Azurite emulator in development)
 var storage = builder.AddAzureStorage("storage")
-    .RunAsEmulator();
+    .RunAsEmulator(azurite =>
+    {
+        azurite.WithLifetime(ContainerLifetime.Persistent);
+    });
 
 var tables = storage.AddTables("tables");
 
