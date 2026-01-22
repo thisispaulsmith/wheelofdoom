@@ -1,0 +1,18 @@
+{
+  "name": "wheel-of-doom",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test:app": "vitest run --config vitest.config.js",
+    "test:app:watch": "vitest --config vitest.config.js",
+    "test:api": "dotnet test test/api",
+    "test:e2e": "playwright test --config test/e2e/playwright.config.js",
+    "test": "npm run test:app && npm run test:api"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.17",
+    "@vitejs/plugin-react": "^5.1.1",
+    "jsdom": "^27.4.0"
+  }
+}

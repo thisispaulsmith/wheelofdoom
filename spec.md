@@ -24,7 +24,10 @@ A shared team web app that randomly selects a person from a list using an animat
 - Displayed in sidebar, newest first
 
 ### 4. Fun Elements
-- **Sounds**: Tick-tick-tick while spinning, drumroll, winner fanfare
+- **Sounds**: Web Audio API synthesized sounds (no external files needed)
+  - Tick: Short click sound for each wheel segment
+  - Drumroll: Accelerating low-frequency rumble during spin
+  - Fanfare: Triumphant chord progression on winner selection
 - **Animations**: Confetti burst, winner spotlight/highlight
 - **Messages**: Random dramatic announcements ("The Wheel has spoken!", "Fate has decided...", "Today's victim is...")
 
@@ -69,15 +72,12 @@ A shared team web app that randomly selects a person from a list using an animat
 ├── staticwebapp.config.json
 ├── spec.md
 ├── src/
+│   ├── AppHost/                       # .NET Aspire orchestration
+│   ├── ServiceDefaults/               # Aspire shared config
 │   ├── app/                           # React frontend
 │   │   ├── package.json
 │   │   ├── vite.config.js
 │   │   ├── index.html
-│   │   ├── public/
-│   │   │   └── sounds/
-│   │   │       ├── tick.mp3
-│   │   │       ├── drumroll.mp3
-│   │   │       └── fanfare.mp3
 │   │   └── src/
 │   │       ├── main.jsx
 │   │       ├── App.jsx
@@ -211,6 +211,20 @@ Uses Azure Static Web Apps built-in authentication with Azure AD.
 ```
 
 ## Local Development
+
+### Using .NET Aspire (Recommended)
+
+```bash
+cd src/AppHost && dotnet run
+```
+
+This starts:
+- Azurite storage emulator
+- Azure Functions API
+- React frontend
+- Aspire Dashboard (observability)
+
+### Manual Start
 
 ```bash
 # Frontend (from repo root)

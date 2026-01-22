@@ -1,0 +1,53 @@
+.app {
+  min-height: 100vh;
+  background: #111827;
+  color: #F9FAFB;
+}
+
+.app-header {
+  padding: 1rem 2rem;
+  background: #1F2937;
+  border-bottom: 1px solid #374151;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #F9FAFB;
+}
+
+.app-main {
+  display: flex;
+  gap: 2rem;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.wheel-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar {
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Responsive layout */
+@media (max-width: 900px) {
+  .app-main {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .sidebar {
+    width: 100%;
+    max-width: 500px;
+  }
+}
