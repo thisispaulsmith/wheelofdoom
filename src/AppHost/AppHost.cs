@@ -12,7 +12,8 @@ var api = builder.AddAzureFunctionsProject<Projects.WheelOfDoom_Api>("api")
     .WaitFor(tables);
 
 // React Frontend
-var frontend = builder.AddNpmApp("frontend", "../app", "dev")
+var frontend = builder.AddJavaScriptApp("frontend", "../app", "dev")
+    .WithNpm(installCommand: "ci", installArgs: ["--legacy-peer-deps"])
     .WithReference(api)
     .WaitFor(api)
     .WithHttpEndpoint(env: "PORT")
