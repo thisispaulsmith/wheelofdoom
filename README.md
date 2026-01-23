@@ -154,7 +154,12 @@ npm test                      # Runs frontend + backend tests
 
 ### Continuous Integration
 
-All pull requests automatically run frontend and backend tests via GitHub Actions. Both test suites must pass before a PR can be merged.
+All pull requests automatically run three test suites via GitHub Actions:
+- **Frontend Tests** (Vitest): 53 unit and component tests
+- **Backend Tests** (xUnit): 19 API and service tests
+- **E2E Tests** (Playwright): 10 end-to-end user flow tests
+
+All test suites must pass before a PR can be merged.
 
 View test results: [GitHub Actions](https://github.com/thisispaulsmith/wheelofdoom/actions)
 
