@@ -40,7 +40,7 @@ export function Wheel({ entries, onSpinComplete, onTick, disabled }) {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (entries.length === 0) {
+    if (entries.length < 2) {
       // Draw empty wheel
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
@@ -53,7 +53,7 @@ export function Wheel({ entries, onSpinComplete, onTick, disabled }) {
       ctx.fillStyle = '#9CA3AF';
       ctx.font = '20px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText('Add names to spin!', centerX, centerY);
+      ctx.fillText('Add at least 2 names to spin!', centerX, centerY);
       return;
     }
 
@@ -115,7 +115,7 @@ export function Wheel({ entries, onSpinComplete, onTick, disabled }) {
   }, [rotation, drawWheel]);
 
   const spin = useCallback(() => {
-    if (isSpinning || entries.length === 0 || disabled) return;
+    if (isSpinning || entries.length < 2 || disabled) return;
 
     setIsSpinning(true);
 
@@ -189,7 +189,7 @@ export function Wheel({ entries, onSpinComplete, onTick, disabled }) {
         onClick={spin}
         className={`wheel-canvas ${isSpinning ? 'spinning' : ''} ${disabled ? 'disabled' : ''}`}
       />
-      {!isSpinning && entries.length > 0 && (
+      {!isSpinning && entries.length >= 2 && (
         <div className="wheel-prompt">Click to spin!</div>
       )}
     </div>
