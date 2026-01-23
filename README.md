@@ -1,5 +1,7 @@
 # Wheel of Doom
 
+[![PR Tests](https://github.com/thisispaulsmith/wheelofdoom/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/thisispaulsmith/wheelofdoom/actions/workflows/pr-tests.yml)
+
 A fun spinning wheel web app for random team task assignment. Built with React, .NET Azure Functions, and Azure Static Web Apps.
 
 ## Prerequisites
@@ -149,6 +151,12 @@ npm run test:ui              # Interactive UI mode
 # From repository root
 npm test                      # Runs frontend + backend tests
 ```
+
+### Continuous Integration
+
+All pull requests automatically run frontend and backend tests via GitHub Actions. Both test suites must pass before a PR can be merged.
+
+View test results: [GitHub Actions](https://github.com/thisispaulsmith/wheelofdoom/actions)
 
 ## Azure Deployment
 
