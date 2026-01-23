@@ -28,8 +28,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          npm install --legacy-peer-deps
-          cd src/app && npm install --legacy-peer-deps
+          npm ci --legacy-peer-deps
+          cd src/app && npm ci --legacy-peer-deps
 
       - name: Run frontend tests
         run: npm run test:app
