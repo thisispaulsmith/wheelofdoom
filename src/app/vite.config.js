@@ -20,11 +20,4 @@ export default defineConfig({
       },
     },
   },
-  test: {
-    globals: true,
-    environment: 'jsdom',
-    setupFiles: './test/app/setup.js',
-    include: ['test/app/**/*.test.{js,jsx}'],
-    root: resolve(__dirname, '../..'),
-  },
 })

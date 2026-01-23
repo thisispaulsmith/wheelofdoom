@@ -5,7 +5,7 @@ A fun spinning wheel web app for random team task assignment. Built with React, 
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) (v18+)
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Azure Functions Core Tools](https://docs.microsoft.com/azure/azure-functions/functions-run-local) (v4)
 - [Docker](https://www.docker.com/) (for Aspire/Azurite emulator)
 
@@ -98,7 +98,7 @@ docker run -p 10000:10000 -p 10001:10001 -p 10002:10002 mcr.microsoft.com/azure-
 ├── staticwebapp.config.json   # Azure Static Web Apps config
 ├── src/
 │   ├── app/                   # React frontend (Vite)
-│   ├── api/                   # .NET 8 Azure Functions
+│   ├── api/                   # .NET 10 Azure Functions
 │   ├── AppHost/               # .NET Aspire orchestration
 │   └── ServiceDefaults/       # Aspire shared configuration
 └── test/
@@ -109,32 +109,45 @@ docker run -p 10000:10000 -p 10001:10001 -p 10002:10002 mcr.microsoft.com/azure-
 
 ## Testing
 
-### All Tests
+**All tests run from the root directory** (not from src/app/).
+
+### Frontend Tests (Vitest)
 
 ```bash
-# Frontend (53 tests)
-npm run test:app
-
-# Backend (19 tests)
-dotnet test WheelOfDoom.slnx
-
-# E2E (requires frontend running)
-cd test/e2e
-npm test
+# From repository root
+npm run test:app              # Run once (53 tests)
+npm run test:app:watch        # Watch mode
 ```
 
-### Individual Test Commands
+Frontend tests are in `test/app/` and use the root `vitest.config.js`.
+
+### Backend Tests (xUnit)
 
 ```bash
-# Frontend with watch mode
-npm run test:app:watch
+# From repository root
+npm run test:api              # .NET tests (19 tests)
 
-# Backend only
-dotnet test test/api
+# Or directly
+dotnet test WheelOfDoom.slnx
+```
 
-# E2E with UI
+### E2E Tests (Playwright)
+
+```bash
+# From repository root
+npm run test:e2e
+
+# Or from test/e2e directory
 cd test/e2e
-npm run test:ui
+npm test                      # Basic run
+npm run test:ui              # Interactive UI mode
+```
+
+### Run All Tests
+
+```bash
+# From repository root
+npm test                      # Runs frontend + backend tests
 ```
 
 ## Azure Deployment
