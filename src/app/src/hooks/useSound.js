@@ -95,8 +95,8 @@ function createFanfare() {
 
     const startTime = ctx.currentTime + note.start;
     gainNode.gain.setValueAtTime(0, startTime);
-    gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.02);
-    gainNode.gain.setValueAtTime(0.3, startTime + note.duration - 0.05);
+    gainNode.gain.linearRampToValueAtTime(0.15, startTime + 0.02);
+    gainNode.gain.setValueAtTime(0.15, startTime + note.duration - 0.05);
     gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + note.duration);
 
     oscillator.start(startTime);
@@ -115,7 +115,7 @@ function createFanfare() {
     oscillator.type = 'sine';
 
     const startTime = ctx.currentTime + 0.4 + i * 0.08;
-    gainNode.gain.setValueAtTime(0.1, startTime);
+    gainNode.gain.setValueAtTime(0.05, startTime);
     gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + 0.1);
 
     oscillator.start(startTime);
