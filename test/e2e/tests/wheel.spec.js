@@ -67,9 +67,10 @@ test.describe('Wheel of Doom', () => {
 
   test('displays entries list', async ({ page }) => {
     await expect(page.getByText('Entries')).toBeVisible();
-    await expect(page.getByText('Alice')).toBeVisible();
-    await expect(page.getByText('Bob')).toBeVisible();
-    await expect(page.getByText('Charlie')).toBeVisible();
+    const entryList = page.locator('.entry-list');
+    await expect(entryList.getByText('Alice')).toBeVisible();
+    await expect(entryList.getByText('Bob')).toBeVisible();
+    await expect(entryList.getByText('Charlie')).toBeVisible();
   });
 
   test('displays entry count', async ({ page }) => {
