@@ -86,4 +86,14 @@ describe('Wheel', () => {
 
     expect(onSpinComplete).not.toHaveBeenCalled();
   });
+
+  it('does not spin when only one entry', () => {
+    const onSpinComplete = vi.fn();
+    render(<Wheel entries={[{ name: 'Alice' }]} onSpinComplete={onSpinComplete} />);
+
+    const canvas = document.querySelector('canvas');
+    fireEvent.click(canvas);
+
+    expect(onSpinComplete).not.toHaveBeenCalled();
+  });
 });

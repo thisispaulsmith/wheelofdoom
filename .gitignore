@@ -43,6 +43,10 @@ npm-debug.log*
 # Test coverage
 coverage/
 
+# Playwright
+playwright-report/
+test-results/
+
 # Misc
 *.tmp
 *.temp
