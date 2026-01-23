@@ -175,4 +175,52 @@ test.describe('Wheel of Doom - Empty State', () => {
   test('does not show spin prompt when no entries', async ({ page }) => {
     await expect(page.getByText('Click to spin!')).not.toBeVisible();
   });
+
+  test('shows minimum entries message when no entries', async ({ page }) => {
+    await expect(page.getByText('Add at least 2 names to spin!')).toBeVisible();
+  });
+});
+
+test.describe('Wheel of Doom - Single Entry State', () => {
+  test.beforeEach(async ({ page }) => {
+    // Mock API with only one entry
+    await page.route('**/api/entries', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          { name: 'Alice', addedBy: 'user1', addedAt: '2026-01-22T10:00:00Z' },
+        ]),
+      });
+    });
+
+    await page.route('**/api/results', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
+
+    await page.goto('/');
+  });
+
+  test('does not show spin prompt with only one entry', async ({ page }) => {
+    await expect(page.getByText('Click to spin!')).not.toBeVisible();
+  });
+
+  test('shows minimum entries message with only one entry', async ({ page }) => {
+    await expect(page.getByText('Add at least 2 names to spin!')).toBeVisible();
+  });
+
+  test('wheel does not spin with only one entry', async ({ page }) => {
+    const canvas = page.locator('canvas');
+    await canvas.click();
+
+    // The prompt should still not be visible (wheel didn't spin)
+    await expect(page.getByText('Click to spin!')).not.toBeVisible();
+
+    // Winner modal should not appear
+    await expect(page.locator('.winner-modal')).not.toBeVisible();
+  });
 });
