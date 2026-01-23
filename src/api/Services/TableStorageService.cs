@@ -8,10 +8,8 @@ public class TableStorageService : ITableStorageService
     private readonly TableClient _entriesTable;
     private readonly TableClient _resultsTable;
 
-    public TableStorageService(string connectionString)
+    public TableStorageService(TableServiceClient serviceClient)
     {
-        var serviceClient = new TableServiceClient(connectionString);
-
         _entriesTable = serviceClient.GetTableClient("Entries");
         _entriesTable.CreateIfNotExists();
 
