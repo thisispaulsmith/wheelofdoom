@@ -11,6 +11,7 @@ var tables = storage.AddTables("tables");
 
 // Azure Functions API
 var api = builder.AddAzureFunctionsProject<Projects.WheelOfDoom_Api>("api")
+    .WithHostStorage(storage)
     .WithReference(tables)
     .WaitFor(tables);
 

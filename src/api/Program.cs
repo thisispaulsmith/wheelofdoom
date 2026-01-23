@@ -9,10 +9,10 @@ builder.AddServiceDefaults();
 
 builder.ConfigureFunctionsWebApplication();
 
+// Use Aspire client integration
+builder.AddAzureTableServiceClient("tables");
+
 // Register Table Storage service
-var connectionString = builder.Configuration["AzureWebJobsStorage"]
-    ?? Environment.GetEnvironmentVariable("AzureWebJobsStorage")
-    ?? "UseDevelopmentStorage=true";
-builder.Services.AddSingleton<ITableStorageService>(new TableStorageService(connectionString));
+builder.Services.AddSingleton<ITableStorageService, TableStorageService>();
 
 builder.Build().Run();
