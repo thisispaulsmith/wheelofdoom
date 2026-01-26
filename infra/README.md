@@ -37,7 +37,7 @@ The Bicep template (`main.bicep`) provisions the following Azure resources:
    - Soft delete enabled (7-day retention)
    - Stores sensitive secrets (connection strings, client secrets)
    - Prevents secret exposure in logs and deployment history
-   - **Automated**: Bicep deployment script stores storage connection string directly (no exposure in outputs or logs)
+   - **Automated**: Bicep creates secret resource with storage connection string (never exposed in outputs)
 
 ## Manual Deployment
 
@@ -99,11 +99,11 @@ Save this token as `AZURE_STATIC_WEB_APPS_API_TOKEN` in GitHub secrets.
 
 ### 2. How Secrets Are Managed
 
-**Bicep Deployment Script** (automatic):
-- During Bicep deployment, a managed identity is created
-- Deployment script retrieves storage account connection string
-- Script stores it directly in Key Vault secret: `storage-connection-string`
-- **No secret exposure** - happens entirely within Azure, never in logs or outputs
+**Bicep Template** (automatic):
+- Bicep creates Key Vault secret resource with storage connection string
+- Uses `listKeys()` to retrieve storage account key
+- **Safe to use in secret resource** - value stored encrypted in Key Vault, not in deployment outputs
+- Secret resource: `storage-connection-string`
 
 **GitHub Actions Workflow** (automatic):
 - Workflow stores AAD client secret from GitHub secrets into Key Vault: `aad-client-secret`
@@ -112,8 +112,9 @@ Save this token as `AZURE_STATIC_WEB_APPS_API_TOKEN` in GitHub secrets.
   @Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)
   ```
 
-This approach ensures:
-- ✅ Storage connection string never leaves Azure
+**Security Pattern**:
+- ✅ `listKeys()` in **outputs** = BAD (plaintext in deployment history)
+- ✅ `listKeys()` in **secret resource** = GOOD (encrypted in Key Vault)
 - ✅ No secrets in Bicep outputs or deployment history
 - ✅ No secrets exposed in GitHub Actions logs
 - ✅ RBAC-controlled access to all secrets

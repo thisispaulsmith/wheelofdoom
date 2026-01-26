@@ -270,20 +270,24 @@ az deployment group create \
 | Authentication | Bypassed | Azure AD via `staticwebapp.config.json` |
 | API URL | Vite proxy to `localhost:7071` | Managed Functions integration |
 
-**Critical Pattern**: Secrets managed securely via Bicep deployment script + Key Vault:
+**Critical Pattern**: Secrets managed securely via Bicep Key Vault secret resources:
 
-1. **Bicep Deployment Script** (automatic during infrastructure deployment):
-   - Creates managed identity with permissions to read storage keys and write to Key Vault
-   - Retrieves storage account connection string within Azure
-   - Stores directly in Key Vault secret (`storage-connection-string`)
-   - **Never exposed in outputs, logs, or deployment history**
+1. **Bicep Secret Resource** (automatic during infrastructure deployment):
+   - Creates `Microsoft.KeyVault/vaults/secrets` resource for storage connection string
+   - Uses `listKeys()` to retrieve storage account key (safe in secret resource, not in outputs)
+   - Value stored encrypted in Key Vault, never in deployment outputs/history
+   - Secret name: `storage-connection-string`
 
 2. **GitHub Actions Workflow** (only for external secrets):
    - Grants itself Key Vault access
    - Stores AAD client secret from GitHub secrets into Key Vault
    - Configures app settings with Key Vault reference syntax
 
-3. **App Settings Configuration**: Use Key Vault references instead of plaintext:
+3. **Security Pattern**:
+   - ✅ `listKeys()` in **outputs** = BAD (plaintext exposure)
+   - ✅ `listKeys()` in **secret resource** = GOOD (encrypted in Key Vault)
+
+4. **App Settings Configuration**: Use Key Vault references instead of plaintext:
 
 ```bash
 az staticwebapp appsettings set \

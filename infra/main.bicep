@@ -104,91 +104,15 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
-// Managed Identity for deployment script
-resource deploymentScriptIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
-  name: '${keyVaultName}-script-identity'
-  location: location
-  tags: {
-    environment: environmentName
-    application: 'WheelOfDoom'
-  }
-}
-
-// Grant deployment script identity permission to read storage account keys
-resource storageKeyOperatorRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(storageAccount.id, deploymentScriptIdentity.id, 'StorageAccountKeyOperatorServiceRole')
-  scope: storageAccount
+// Store storage account connection string as Key Vault secret
+// Note: Using listKeys() here is SAFE - the value is stored encrypted in Key Vault,
+// not exposed in deployment outputs/history (unlike output variables)
+resource storageConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'storage-connection-string'
   properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '81a9662b-bebf-436f-a333-f67b29880f12') // Storage Account Key Operator Service Role
-    principalId: deploymentScriptIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
+    value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${listKeys(storageAccount.id, storageAccount.apiVersion).keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
   }
-}
-
-// Grant deployment script identity permission to write secrets to Key Vault
-resource keyVaultSecretsOfficerRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.id, deploymentScriptIdentity.id, 'KeyVaultSecretsOfficer')
-  scope: keyVault
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7') // Key Vault Secrets Officer
-    principalId: deploymentScriptIdentity.properties.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
-
-// Deployment script to store storage connection string in Key Vault
-resource storeConnectionString 'Microsoft.Resources/deploymentScripts@2023-08-01' = {
-  name: 'store-storage-connection-string'
-  location: location
-  kind: 'AzureCLI'
-  identity: {
-    type: 'UserAssigned'
-    userAssignedIdentities: {
-      '${deploymentScriptIdentity.id}': {}
-    }
-  }
-  properties: {
-    azCliVersion: '2.52.0'
-    retentionInterval: 'P1D'
-    timeout: 'PT10M'
-    cleanupPreference: 'OnSuccess'
-    environmentVariables: [
-      {
-        name: 'STORAGE_ACCOUNT_NAME'
-        value: storageAccount.name
-      }
-      {
-        name: 'RESOURCE_GROUP'
-        value: resourceGroup().name
-      }
-      {
-        name: 'KEY_VAULT_NAME'
-        value: keyVault.name
-      }
-    ]
-    scriptContent: '''
-      # Get storage account connection string
-      CONNECTION_STRING=$(az storage account show-connection-string \
-        --name $STORAGE_ACCOUNT_NAME \
-        --resource-group $RESOURCE_GROUP \
-        --query connectionString \
-        --output tsv)
-
-      # Store in Key Vault
-      az keyvault secret set \
-        --vault-name $KEY_VAULT_NAME \
-        --name "storage-connection-string" \
-        --value "$CONNECTION_STRING"
-
-      echo "Successfully stored storage connection string in Key Vault"
-    '''
-  }
-  dependsOn: [
-    storageKeyOperatorRole
-    keyVaultSecretsOfficerRole
-    entriesTable
-    resultsTable
-  ]
 }
 
 // Outputs

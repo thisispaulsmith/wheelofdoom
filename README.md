@@ -241,19 +241,23 @@ See `infra/README.md` for detailed setup instructions.
 - `AzureWebJobsStorage` - References Key Vault secret (secure)
 - `ConnectionStrings__tables` - References Key Vault secret (secure)
 
-**Security**: Sensitive secrets are managed securely via Bicep deployment script and Key Vault:
+**Security**: Sensitive secrets are managed securely via Bicep Key Vault secret resources:
 
 **Automated Secret Management**:
-- **Storage connection string**: Bicep deployment script retrieves and stores in Key Vault (never exposed)
+- **Storage connection string**: Bicep creates secret resource using `listKeys()` (safe - encrypted in Key Vault, not in outputs)
 - **AAD client secret**: GitHub Actions workflow stores from secrets into Key Vault
 - **App settings**: Use Key Vault reference syntax instead of plaintext:
   ```
   @Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)
   ```
 
-**Security Benefits**:
-- ✅ Storage connection string never leaves Azure (no exposure in outputs/logs)
-- ✅ No secrets in plaintext in app settings or deployment history
+**Security Pattern**:
+- ✅ `listKeys()` in outputs = BAD (plaintext in deployment history)
+- ✅ `listKeys()` in secret resource = GOOD (encrypted in Key Vault)
+
+**Benefits**:
+- ✅ No secrets in Bicep outputs or deployment history
+- ✅ No secrets in plaintext in app settings
 - ✅ RBAC-controlled access to Key Vault
 - ✅ Audit logs for all secret access
 
