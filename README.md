@@ -224,6 +224,7 @@ See `infra/README.md` for detailed setup instructions.
 |----------|------|---------|
 | `wheelofdoom-swa` | Static Web App (Standard) | Hosts frontend + managed Functions backend |
 | `wheelodomstorage` | Storage Account | Azure Table Storage for entries and results |
+| `wheelofdoom-kv` | Key Vault (Standard) | Secure storage for connection strings and secrets |
 | Entries | Table | Stores wheel entries |
 | Results | Table | Stores spin history |
 
@@ -235,10 +236,26 @@ See `infra/README.md` for detailed setup instructions.
 - Unauthenticated users redirected to `/.auth/login/aad`
 
 **App Settings** (automatically configured by deployment workflow):
-- `AAD_CLIENT_ID` - Azure AD application client ID
-- `AAD_CLIENT_SECRET` - Azure AD client secret
-- `AzureWebJobsStorage` - Azure Storage connection string
-- `ConnectionStrings__tables` - Storage connection (matches Aspire format)
+- `AAD_CLIENT_ID` - Azure AD application client ID (plaintext - not sensitive)
+- `AAD_CLIENT_SECRET` - References Key Vault secret (secure)
+- `AzureWebJobsStorage` - References Key Vault secret (secure)
+- `ConnectionStrings__tables` - References Key Vault secret (secure)
+
+**Security**: Sensitive secrets are managed securely via Bicep deployment script and Key Vault:
+
+**Automated Secret Management**:
+- **Storage connection string**: Bicep deployment script retrieves and stores in Key Vault (never exposed)
+- **AAD client secret**: GitHub Actions workflow stores from secrets into Key Vault
+- **App settings**: Use Key Vault reference syntax instead of plaintext:
+  ```
+  @Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)
+  ```
+
+**Security Benefits**:
+- ✅ Storage connection string never leaves Azure (no exposure in outputs/logs)
+- ✅ No secrets in plaintext in app settings or deployment history
+- ✅ RBAC-controlled access to Key Vault
+- ✅ Audit logs for all secret access
 
 **Key Insight**: Backend code works unchanged in both development (Aspire) and production (Azure) because `ConnectionStrings__tables` matches Aspire's expected configuration format.
 
@@ -248,6 +265,7 @@ See `infra/README.md` for detailed setup instructions.
 - Azure Static Web Apps Standard: $9/month
 - Azure Functions: $0-1/month (within free tier)
 - Azure Storage: $1-5/month
+- Azure Key Vault: ~$0.03/month (minimal secret operations)
 
 ### Build Configuration
 

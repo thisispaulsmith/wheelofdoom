@@ -31,6 +31,14 @@ The Bicep template (`main.bicep`) provisions the following Azure resources:
    - Entries table: Stores wheel entries (PartitionKey: "wheel", RowKey: person name)
    - Results table: Stores spin results (PartitionKey: "wheel", RowKey: inverted timestamp)
 
+4. **Azure Key Vault** (`wheelofdoom-kv`)
+   - SKU: Standard tier
+   - RBAC-enabled for access control
+   - Soft delete enabled (7-day retention)
+   - Stores sensitive secrets (connection strings, client secrets)
+   - Prevents secret exposure in logs and deployment history
+   - **Automated**: Bicep deployment script stores storage connection string directly (no exposure in outputs or logs)
+
 ## Manual Deployment
 
 ### Step 1: Create Resource Group
@@ -89,20 +97,52 @@ az staticwebapp secrets list \
 
 Save this token as `AZURE_STATIC_WEB_APPS_API_TOKEN` in GitHub secrets.
 
-### 2. Configure App Settings
+### 2. How Secrets Are Managed
 
-The deployment workflow automatically configures these settings, but you can also set them manually:
+**Bicep Deployment Script** (automatic):
+- During Bicep deployment, a managed identity is created
+- Deployment script retrieves storage account connection string
+- Script stores it directly in Key Vault secret: `storage-connection-string`
+- **No secret exposure** - happens entirely within Azure, never in logs or outputs
 
+**GitHub Actions Workflow** (automatic):
+- Workflow stores AAD client secret from GitHub secrets into Key Vault: `aad-client-secret`
+- App settings configured with Key Vault reference syntax:
+  ```
+  @Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)
+  ```
+
+This approach ensures:
+- ✅ Storage connection string never leaves Azure
+- ✅ No secrets in Bicep outputs or deployment history
+- ✅ No secrets exposed in GitHub Actions logs
+- ✅ RBAC-controlled access to all secrets
+
+**Manual configuration** (if needed):
 ```bash
+# Store secrets in Key Vault
+az keyvault secret set \
+  --vault-name wheelofdoom-kv \
+  --name "storage-connection-string" \
+  --value "<connection-string>"
+
+# Configure app settings with Key Vault references
 az staticwebapp appsettings set \
   --name wheelofdoom-swa \
   --resource-group rg-wheelofdoom-prod \
   --setting-names \
     AAD_CLIENT_ID="<your-aad-client-id>" \
-    AAD_CLIENT_SECRET="<your-aad-client-secret>" \
-    AzureWebJobsStorage="<storage-connection-string>" \
-    ConnectionStrings__tables="<storage-connection-string>"
+    AAD_CLIENT_SECRET="@Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=aad-client-secret)" \
+    AzureWebJobsStorage="@Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)" \
+    ConnectionStrings__tables="@Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)"
 ```
+
+**Security Benefits**:
+- ✅ Secrets never appear in plaintext in deployment outputs
+- ✅ No secret exposure in workflow logs (masked + Key Vault storage)
+- ✅ Secrets stored with encryption at rest and in transit
+- ✅ RBAC-controlled access to Key Vault
+- ✅ Audit logs for all secret access
 
 **Important**: `ConnectionStrings__tables` matches Aspire's expected configuration format, allowing the backend code to work unchanged in both development (Aspire) and production (Azure Static Web Apps).
 
@@ -124,8 +164,13 @@ The Bicep template outputs the following values (useful for CI/CD):
 - `staticWebAppId` - Resource ID
 - `staticWebAppName` - Resource name
 - `storageAccountName` - Storage account name
+- `storageAccountId` - Storage account resource ID
 - `tableEndpoint` - Table storage endpoint
-- `connectionString` - Storage connection string (sensitive - use in CI/CD only)
+- `keyVaultName` - Key Vault name
+- `keyVaultUri` - Key Vault URI
+- `keyVaultId` - Key Vault resource ID
+
+**Note**: Connection strings are NOT output for security reasons. They are stored securely in Key Vault by the deployment workflow.
 
 View outputs:
 
@@ -137,6 +182,12 @@ az deployment group show \
 ```
 
 ## Cost Monitoring
+
+**Estimated Monthly Cost**: $10-15
+- Azure Static Web Apps (Standard): $9/month
+- Azure Storage (Table Storage): $1-5/month
+- Azure Key Vault (Standard): ~$0.03/month (2 secrets × 10,000 operations)
+- Azure Functions: $0-1/month (within free tier)
 
 ### Set Up Budget Alert
 

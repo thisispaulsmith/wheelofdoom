@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       static-web-app-name: ${{ steps.deploy-infra.outputs.staticWebAppName }}
-      storage-connection-string: ${{ steps.deploy-infra.outputs.connectionString }}
+      key-vault-name: ${{ steps.deploy-infra.outputs.keyVaultName }}
 
     steps:
       - name: Checkout repository
@@ -42,22 +42,53 @@ jobs:
           parameters: ./infra/main.bicepparam
           failOnStdErr: false
 
+      - name: Grant Key Vault Access to Service Principal
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            # Grant the GitHub Actions service principal access to Key Vault secrets
+            # Only needed to write AAD client secret (storage connection string handled by Bicep)
+            az role assignment create \
+              --assignee ${{ secrets.AZURE_CLIENT_ID }} \
+              --role "Key Vault Secrets Officer" \
+              --scope ${{ steps.deploy-infra.outputs.keyVaultId }}
+
+            echo "✅ Granted Key Vault Secrets Officer role to service principal"
+
+      - name: Store AAD Client Secret in Key Vault
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            # Storage connection string already stored by Bicep deployment script
+            # Only need to store AAD client secret from GitHub secrets
+
+            az keyvault secret set \
+              --vault-name ${{ steps.deploy-infra.outputs.keyVaultName }} \
+              --name "aad-client-secret" \
+              --value "${{ secrets.AAD_CLIENT_SECRET }}"
+
+            echo "✅ AAD client secret stored securely in Key Vault"
+            echo "✅ Storage connection string was stored by Bicep deployment script"
+
       - name: Configure Static Web App Settings
         uses: azure/cli@v2
         with:
           azcliversion: latest
           inlineScript: |
-            # Configure app settings - NOTE: ConnectionStrings__tables matches Aspire's expected format!
+            # Configure app settings using Key Vault references
+            # NOTE: ConnectionStrings__tables matches Aspire's expected format!
             az staticwebapp appsettings set \
               --name ${{ steps.deploy-infra.outputs.staticWebAppName }} \
               --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
               --setting-names \
                 AAD_CLIENT_ID="${{ secrets.AAD_CLIENT_ID }}" \
-                AAD_CLIENT_SECRET="${{ secrets.AAD_CLIENT_SECRET }}" \
-                AzureWebJobsStorage="${{ steps.deploy-infra.outputs.connectionString }}" \
-                ConnectionStrings__tables="${{ steps.deploy-infra.outputs.connectionString }}"
+                AAD_CLIENT_SECRET="@Microsoft.KeyVault(VaultName=${{ steps.deploy-infra.outputs.keyVaultName }};SecretName=aad-client-secret)" \
+                AzureWebJobsStorage="@Microsoft.KeyVault(VaultName=${{ steps.deploy-infra.outputs.keyVaultName }};SecretName=storage-connection-string)" \
+                ConnectionStrings__tables="@Microsoft.KeyVault(VaultName=${{ steps.deploy-infra.outputs.keyVaultName }};SecretName=storage-connection-string)"
 
-            echo "✅ Configuration matches Aspire format - no backend code changes needed!"
+            echo "✅ App settings configured with Key Vault references - no secrets in plaintext!"
 
   deploy-application:
     name: Build and Deploy Application
@@ -115,7 +146,7 @@ jobs:
 
   run-smoke-tests:
     name: Run Smoke Tests
-    needs: deploy-application
+    needs: [deploy-infrastructure, deploy-application]
     runs-on: ubuntu-latest
 
     steps:

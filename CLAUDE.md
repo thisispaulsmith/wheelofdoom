@@ -226,6 +226,7 @@ infra/
 1. Azure Static Web App (Standard tier) - `wheelofdoom-swa`
 2. Storage Account (Standard LRS) - `wheelodomstorage`
 3. Table Service with Entries and Results tables
+4. Azure Key Vault (Standard tier) - `wheelofdoom-kv` (secure secret storage)
 
 **Deploy Infrastructure**:
 ```bash
@@ -241,7 +242,7 @@ az deployment group create \
 **Workflow**: `.github/workflows/azure-deploy.yml`
 
 **Three Jobs**:
-1. **deploy-infrastructure**: Deploys Bicep template, configures app settings
+1. **deploy-infrastructure**: Deploys Bicep template (including Key Vault), grants service principal Key Vault access, stores secrets in Key Vault, configures app settings with Key Vault references
 2. **deploy-application**: Builds frontend/backend, deploys to Static Web Apps
 3. **run-smoke-tests**: Verifies deployment health
 
@@ -269,19 +270,40 @@ az deployment group create \
 | Authentication | Bypassed | Azure AD via `staticwebapp.config.json` |
 | API URL | Vite proxy to `localhost:7071` | Managed Functions integration |
 
-**Critical Pattern**: The deployment workflow configures `ConnectionStrings__tables` in Azure app settings to match Aspire's format:
+**Critical Pattern**: Secrets managed securely via Bicep deployment script + Key Vault:
+
+1. **Bicep Deployment Script** (automatic during infrastructure deployment):
+   - Creates managed identity with permissions to read storage keys and write to Key Vault
+   - Retrieves storage account connection string within Azure
+   - Stores directly in Key Vault secret (`storage-connection-string`)
+   - **Never exposed in outputs, logs, or deployment history**
+
+2. **GitHub Actions Workflow** (only for external secrets):
+   - Grants itself Key Vault access
+   - Stores AAD client secret from GitHub secrets into Key Vault
+   - Configures app settings with Key Vault reference syntax
+
+3. **App Settings Configuration**: Use Key Vault references instead of plaintext:
 
 ```bash
 az staticwebapp appsettings set \
   --name wheelofdoom-swa \
   --setting-names \
-    ConnectionStrings__tables="DefaultEndpointsProtocol=https;AccountName=..."
+    ConnectionStrings__tables="@Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)"
 ```
 
-This allows `src/api/Program.cs` to remain unchanged:
+This allows `src/api/Program.cs` to remain unchanged while ensuring security:
 ```csharp
 builder.AddAzureTableServiceClient("tables");  // Works in both environments!
 ```
+
+**Security Benefits**:
+- ✅ Storage connection string never leaves Azure (handled entirely in Bicep)
+- ✅ No secrets in Bicep outputs or deployment history
+- ✅ No secrets in workflow logs
+- ✅ RBAC-controlled access to Key Vault
+- ✅ Audit logs for all secret access
+- ✅ Encryption at rest and in transit
 
 ### Deployment Workflow Steps
 
@@ -369,6 +391,7 @@ curl https://wheelofdoom-swa.azurestaticapps.net/api/entries \
 - Azure Static Web Apps Standard: $9/month
 - Azure Functions: $0-1/month (consumption tier)
 - Azure Storage: $1-5/month
+- Azure Key Vault: ~$0.03/month (minimal operations)
 
 **Set Budget Alert**:
 ```bash
