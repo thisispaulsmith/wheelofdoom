@@ -165,34 +165,89 @@ View test results: [GitHub Actions](https://github.com/thisispaulsmith/wheelofdo
 
 ## Azure Deployment
 
-### Azure Static Web Apps Configuration
+The app is automatically deployed to Azure Static Web Apps on every push to `master`.
 
-The app is configured for Azure Static Web Apps with Azure AD authentication.
+**Live URL**: `https://wheelofdoom-swa.azurestaticapps.net` (after initial deployment)
 
-1. Create an Azure Static Web App resource
-2. Configure Azure AD app registration
-3. Update `staticwebapp.config.json` with your tenant ID:
+### Automated Deployment (GitHub Actions)
 
-```json
-{
-  "auth": {
-    "identityProviders": {
-      "azureActiveDirectory": {
-        "registration": {
-          "openIdIssuer": "https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0",
-          "clientIdSettingName": "AAD_CLIENT_ID",
-          "clientSecretSettingName": "AAD_CLIENT_SECRET"
-        }
-      }
-    }
-  }
-}
+The repository includes a complete CI/CD pipeline (`.github/workflows/azure-deploy.yml`) that:
+1. Deploys infrastructure using Bicep templates
+2. Builds frontend and backend
+3. Deploys to Azure Static Web Apps
+4. Runs smoke tests
+
+**To trigger deployment**:
+- Push to `master` branch, or
+- Manually run the "Deploy to Azure" workflow in GitHub Actions
+
+### Infrastructure as Code
+
+All Azure resources are managed via Bicep templates in the `infra/` directory:
+- `main.bicep` - Infrastructure template (Static Web App, Storage Account, Tables)
+- `main.bicepparam` - Parameters file
+- `README.md` - Detailed setup instructions
+
+### Required GitHub Secrets
+
+Configure these secrets in repository settings → Secrets and variables → Actions:
+
+| Secret | Description | How to Get |
+|--------|-------------|------------|
+| `AZURE_CLIENT_ID` | Service principal client ID | Created during Azure setup |
+| `AZURE_TENANT_ID` | Azure AD tenant ID | Azure Portal → Azure Active Directory |
+| `AZURE_SUBSCRIPTION_ID` | Azure subscription ID | Azure Portal → Subscriptions |
+| `AZURE_RESOURCE_GROUP` | Resource group name | `rg-wheelofdoom-prod` |
+| `AZURE_STATIC_WEB_APPS_API_TOKEN` | SWA deployment token | Static Web App → Manage deployment token |
+| `AAD_CLIENT_ID` | Azure AD app client ID | App registration for user auth |
+| `AAD_CLIENT_SECRET` | Azure AD app secret | App registration → Certificates & secrets |
+
+### Manual Infrastructure Deployment
+
+```bash
+# Create resource group
+az group create --name rg-wheelofdoom-prod --location eastus
+
+# Deploy infrastructure
+cd infra
+az deployment group create \
+  --resource-group rg-wheelofdoom-prod \
+  --template-file main.bicep \
+  --parameters main.bicepparam
 ```
 
-4. Set application settings in Azure:
-   - `AAD_CLIENT_ID` - Azure AD application (client) ID
-   - `AAD_CLIENT_SECRET` - Azure AD client secret
-   - `AzureWebJobsStorage` - Azure Storage connection string
+See `infra/README.md` for detailed setup instructions.
+
+### Azure Resources
+
+| Resource | Type | Purpose |
+|----------|------|---------|
+| `wheelofdoom-swa` | Static Web App (Standard) | Hosts frontend + managed Functions backend |
+| `wheelodomstorage` | Storage Account | Azure Table Storage for entries and results |
+| Entries | Table | Stores wheel entries |
+| Results | Table | Stores spin history |
+
+### Configuration
+
+**Azure AD Authentication**: Configured in `staticwebapp.config.json`
+- Update `<TENANT_ID>` placeholder with your Azure AD tenant ID
+- All routes require authentication
+- Unauthenticated users redirected to `/.auth/login/aad`
+
+**App Settings** (automatically configured by deployment workflow):
+- `AAD_CLIENT_ID` - Azure AD application client ID
+- `AAD_CLIENT_SECRET` - Azure AD client secret
+- `AzureWebJobsStorage` - Azure Storage connection string
+- `ConnectionStrings__tables` - Storage connection (matches Aspire format)
+
+**Key Insight**: Backend code works unchanged in both development (Aspire) and production (Azure) because `ConnectionStrings__tables` matches Aspire's expected configuration format.
+
+### Cost Estimate
+
+**Monthly**: $10-15
+- Azure Static Web Apps Standard: $9/month
+- Azure Functions: $0-1/month (within free tier)
+- Azure Storage: $1-5/month
 
 ### Build Configuration
 
@@ -201,6 +256,16 @@ The app is configured for Azure Static Web Apps with Azure AD authentication.
 | App location | `src/app` |
 | Output location | `dist` |
 | API location | `src/api` |
+
+### Troubleshooting
+
+**Deployment fails**: Check GitHub Actions logs and Azure Portal deployment center
+
+**Authentication not working**: Verify tenant ID in `staticwebapp.config.json` and AAD app settings
+
+**API errors**: Check Application Insights logs and verify storage connection string
+
+**For detailed deployment instructions**, see `infra/README.md`
 
 ## API Endpoints
 
