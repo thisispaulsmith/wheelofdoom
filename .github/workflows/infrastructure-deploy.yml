@@ -7,6 +7,8 @@ on:
     paths:
       - 'infra/**'
       - '.github/workflows/infrastructure-deploy.yml'
+    paths-ignore:
+      - 'infra/**/*.md'
   workflow_dispatch:
 
 permissions:
