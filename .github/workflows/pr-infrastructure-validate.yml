@@ -1,0 +1,90 @@
+name: PR Infrastructure Validation
+
+on:
+  pull_request:
+    paths:
+      - 'infra/**'
+      - '.github/workflows/pr-infrastructure-validate.yml'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  bicep-lint:
+    name: Bicep Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Bicep Template
+        run: az bicep build --file ./infra/main.bicep
+
+  bicep-validate:
+    name: Validate Template
+    runs-on: ubuntu-latest
+    needs: bicep-lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate Template
+        run: |
+          az deployment group validate \
+            --resource-group rg-wheelofdoom-prod \
+            --template-file ./infra/main.bicep \
+            --parameters ./infra/main.bicepparam \
+            --parameters aadClientId='${{ secrets.AAD_CLIENT_ID }}' \
+                         aadClientSecret='${{ secrets.AAD_CLIENT_SECRET }}'
+
+  bicep-what-if:
+    name: Preview Infrastructure Changes
+    runs-on: ubuntu-latest
+    needs: bicep-validate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run What-If
+        id: whatif
+        run: |
+          OUTPUT=$(az deployment group what-if \
+            --resource-group rg-wheelofdoom-prod \
+            --template-file ./infra/main.bicep \
+            --parameters ./infra/main.bicepparam \
+            --parameters aadClientId='${{ secrets.AAD_CLIENT_ID }}' \
+                         aadClientSecret='${{ secrets.AAD_CLIENT_SECRET }}' \
+            --validation-level Provider \
+            2>&1)
+
+          echo "output<<EOF" >> $GITHUB_OUTPUT
+          echo "$OUTPUT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post What-If Results
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: infrastructure-changes
+          message: |
+            ## 🔧 Infrastructure Changes Preview
+
+            <details>
+            <summary>Click to expand what-if results</summary>
+
+            ```
+            ${{ steps.whatif.outputs.output }}
+            ```
+            </details>
+
+            *This comment will update automatically when infrastructure files are changed.*
