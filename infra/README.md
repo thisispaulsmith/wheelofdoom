@@ -7,13 +7,13 @@ This directory contains Bicep templates for provisioning Azure resources for the
 - Azure CLI installed (`az --version` to verify)
 - Logged in to Azure (`az login`)
 - Appropriate permissions to create resources in the subscription
-- Resource group created (`rg-wheelofdoom-prod`)
+- Resource group created (`rg-wheelofdoom`)
 
 ## Resources Overview
 
 The Bicep template (`main.bicep`) provisions the following Azure resources:
 
-1. **Azure Static Web App** (`swa-wheelofdoom-`)
+1. **Azure Static Web App** (`swa-wheelofdoom`)
    - SKU: Standard tier
    - Hosts React frontend (Vite build output)
    - Hosts .NET Azure Functions backend (managed)
