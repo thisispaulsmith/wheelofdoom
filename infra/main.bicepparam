@@ -7,8 +7,8 @@ param tenantId = '3edc4486-5878-46a9-a974-2a7787926f35' // Replace with actual t
 param environmentName = 'production'
 param githubActionsPrincipalId = '80b80aad-1520-4322-8eed-dc67b953a5dd' // Replace with service principal object ID
 
-// Secure parameters (AAD credentials) are passed via command line
-// These are NOT stored in this file for security reasons
-param aadClientId = '<Replace>' // Passed from GitHub secrets during workflow execution
-param aadClientSecret = '<Replace>' // Passed from GitHub secrets during workflow execution
+// Secure parameters (AAD credentials) are passed via command line or GitHub secrets
+// DO NOT store actual values in this file - always pass via command line parameters
+param aadClientId = '' // Pass via: --parameters aadClientId='<value>' or from GitHub secret AAD_CLIENT_ID
+param aadClientSecret = '' // Pass via: --parameters aadClientSecret='<value>' or from GitHub secret AAD_CLIENT_SECRET
 
