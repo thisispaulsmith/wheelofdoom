@@ -53,16 +53,40 @@ az group create \
 
 Edit `main.bicepparam` and replace placeholders:
 - `<YOUR_TENANT_ID>` - Your Azure AD tenant ID (find at portal.azure.com → Azure Active Directory → Overview)
+- `<GITHUB_ACTIONS_SP_OBJECT_ID>` - Service principal object ID for GitHub Actions (see below)
 - `storageAccountName` - Must be globally unique (3-24 chars, lowercase/numbers only)
 
+**Get GitHub Actions Service Principal Object ID:**
+```bash
+# If using federated credentials (recommended)
+az ad sp show --id <AZURE_CLIENT_ID> --query id -o tsv
+
+# Or by display name
+az ad sp list --display-name "WheelOfDoom-GitHub-Deploy" --query "[0].id" -o tsv
+```
+
+**Note**: This is the **object ID** (not client ID) of the service principal used by GitHub Actions.
+
 ### Step 3: Deploy Infrastructure
+
+The deployment now requires passing AAD credentials as secure parameters:
 
 ```bash
 az deployment group create \
   --resource-group rg-wheelofdoom-prod \
   --template-file main.bicep \
-  --parameters main.bicepparam
+  --parameters main.bicepparam \
+  --parameters aadClientId='<your-aad-client-id>' aadClientSecret='<your-aad-client-secret>'
 ```
+
+**What happens during deployment:**
+1. Creates Azure Static Web App, Storage Account, and Key Vault
+2. Creates Entries and Results tables
+3. Stores storage connection string in Key Vault (using `listKeys()` - safe in secret resource)
+4. Stores AAD client ID and secret in Key Vault
+5. Grants GitHub Actions service principal Key Vault Secrets Officer role
+6. Configures Static Web App settings with Key Vault references
+7. **All configuration is atomic** - no manual steps required!
 
 ### Step 4: Verify Deployment
 
@@ -85,7 +109,7 @@ az storage table list \
 
 ## Configuration After Deployment
 
-### 1. Get Static Web Apps Deployment Token
+### 1. Get Static Web Apps Deployment Token (One-time Setup)
 
 ```bash
 az staticwebapp secrets list \
@@ -97,53 +121,52 @@ az staticwebapp secrets list \
 
 Save this token as `AZURE_STATIC_WEB_APPS_API_TOKEN` in GitHub secrets.
 
-### 2. How Secrets Are Managed
+### 2. How Secrets Are Managed (Fully Automated)
 
-**Bicep Template** (automatic):
-- Bicep creates Key Vault secret resource with storage connection string
-- Uses `listKeys()` to retrieve storage account key
-- **Safe to use in secret resource** - value stored encrypted in Key Vault, not in deployment outputs
-- Secret resource: `storage-connection-string`
+**All secrets are now managed entirely in Bicep** - no manual configuration or workflow steps required!
 
-**GitHub Actions Workflow** (automatic):
-- Workflow stores AAD client secret from GitHub secrets into Key Vault: `aad-client-secret`
-- App settings configured with Key Vault reference syntax:
-  ```
-  @Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)
-  ```
+**What Bicep Does Automatically:**
 
-**Security Pattern**:
-- ✅ `listKeys()` in **outputs** = BAD (plaintext in deployment history)
-- ✅ `listKeys()` in **secret resource** = GOOD (encrypted in Key Vault)
-- ✅ No secrets in Bicep outputs or deployment history
-- ✅ No secrets exposed in GitHub Actions logs
-- ✅ RBAC-controlled access to all secrets
+1. **Storage Connection String** - Created via Key Vault secret resource:
+   - Uses `listKeys()` to retrieve storage account key
+   - Stored encrypted in Key Vault as `storage-connection-string`
+   - **Safe because it's in a secret resource** (not in outputs)
 
-**Manual configuration** (if needed):
+2. **AAD Credentials** - Passed as secure parameters and stored in Key Vault:
+   - `aadClientId` → Key Vault secret `aad-client-id`
+   - `aadClientSecret` → Key Vault secret `aad-client-secret`
+   - `@secure()` decorator masks values in deployment history
+
+3. **RBAC Permissions** - GitHub Actions service principal granted Key Vault access:
+   - Role: Key Vault Secrets Officer
+   - Allows deployment pipeline to access secrets
+   - Configured via `Microsoft.Authorization/roleAssignments` resource
+
+4. **Static Web App Settings** - Configured with Key Vault references:
+   - `AAD_CLIENT_ID` → `@Microsoft.KeyVault(...;SecretName=aad-client-id)`
+   - `AAD_CLIENT_SECRET` → `@Microsoft.KeyVault(...;SecretName=aad-client-secret)`
+   - `AzureWebJobsStorage` → `@Microsoft.KeyVault(...;SecretName=storage-connection-string)`
+   - `ConnectionStrings__tables` → `@Microsoft.KeyVault(...;SecretName=storage-connection-string)`
+
+**Verify Configuration:**
 ```bash
-# Store secrets in Key Vault
-az keyvault secret set \
-  --vault-name wheelofdoom-kv \
-  --name "storage-connection-string" \
-  --value "<connection-string>"
+# Check Key Vault secrets (should show 3 secrets)
+az keyvault secret list --vault-name wheelofdoom-kv --output table
 
-# Configure app settings with Key Vault references
-az staticwebapp appsettings set \
+# Check Static Web App settings (should show Key Vault references)
+az staticwebapp appsettings list \
   --name wheelofdoom-swa \
-  --resource-group rg-wheelofdoom-prod \
-  --setting-names \
-    AAD_CLIENT_ID="<your-aad-client-id>" \
-    AAD_CLIENT_SECRET="@Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=aad-client-secret)" \
-    AzureWebJobsStorage="@Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)" \
-    ConnectionStrings__tables="@Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)"
+  --resource-group rg-wheelofdoom-prod
 ```
 
-**Security Benefits**:
-- ✅ Secrets never appear in plaintext in deployment outputs
-- ✅ No secret exposure in workflow logs (masked + Key Vault storage)
-- ✅ Secrets stored with encryption at rest and in transit
-- ✅ RBAC-controlled access to Key Vault
-- ✅ Audit logs for all secret access
+**Security Benefits:**
+- ✅ **Single source of truth** - All configuration in Bicep
+- ✅ **No secrets in outputs** - All secrets in Key Vault only
+- ✅ **No workflow steps** - Everything configured during deployment
+- ✅ **Atomic deployment** - Settings deployed with infrastructure
+- ✅ **Secure parameters** - `@secure()` masks values in history
+- ✅ **RBAC-controlled** - Access grants managed as code
+- ✅ **Audit logs** - All secret access logged
 
 **Important**: `ConnectionStrings__tables` matches Aspire's expected configuration format, allowing the backend code to work unchanged in both development (Aspire) and production (Azure Static Web Apps).
 
@@ -171,7 +194,7 @@ The Bicep template outputs the following values (useful for CI/CD):
 - `keyVaultUri` - Key Vault URI
 - `keyVaultId` - Key Vault resource ID
 
-**Note**: Connection strings are NOT output for security reasons. They are stored securely in Key Vault by the deployment workflow.
+**Note**: Secrets (connection strings, AAD credentials) are NOT output for security reasons. They are stored securely in Key Vault by the Bicep template.
 
 View outputs:
 

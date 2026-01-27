@@ -16,6 +16,17 @@ param environmentName string = 'prod'
 @description('Key Vault name (must be globally unique, 3-24 chars)')
 param keyVaultName string
 
+@secure()
+@description('Azure AD client ID for user authentication')
+param aadClientId string
+
+@secure()
+@description('Azure AD client secret for user authentication')
+param aadClientSecret string
+
+@description('GitHub Actions service principal object ID for Key Vault access')
+param githubActionsPrincipalId string
+
 // Azure Static Web App
 resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
   name: staticWebAppName
@@ -104,6 +115,8 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
+var storageKey = storageAccount.listKeys().keys[0].value
+
 // Store storage account connection string as Key Vault secret
 // Note: Using listKeys() here is SAFE - the value is stored encrypted in Key Vault,
 // not exposed in deployment outputs/history (unlike output variables)
@@ -111,8 +124,58 @@ resource storageConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-0
   parent: keyVault
   name: 'storage-connection-string'
   properties: {
-    value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${listKeys(storageAccount.id, storageAccount.apiVersion).keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
+    value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
   }
+}
+
+// Store AAD client ID as Key Vault secret
+resource aadClientIdSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'aad-client-id'
+  properties: {
+    value: aadClientId
+  }
+}
+
+// Store AAD client secret as Key Vault secret
+resource aadClientSecretSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'aad-client-secret'
+  properties: {
+    value: aadClientSecret
+  }
+}
+
+// Grant GitHub Actions service principal Key Vault Secrets Officer role
+// This allows the deployment pipeline to read/write secrets during deployment
+resource githubActionsKeyVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVault.id, githubActionsPrincipalId, 'KeyVaultSecretsOfficer')
+  scope: keyVault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')
+    principalId: githubActionsPrincipalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Configure Static Web App settings with Key Vault references
+// Note: Static Web Apps can read Key Vault secrets via special Azure platform handling
+// The @Microsoft.KeyVault syntax is resolved by Azure at runtime
+resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
+  parent: staticWebApp
+  name: 'appsettings'
+  properties: {
+    AAD_CLIENT_ID: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=aad-client-id)'
+    AAD_CLIENT_SECRET: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=aad-client-secret)'
+    AzureWebJobsStorage: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=storage-connection-string)'
+    ConnectionStrings__tables: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=storage-connection-string)'
+  }
+  dependsOn: [
+    aadClientIdSecret
+    aadClientSecretSecret
+    storageConnectionStringSecret
+    githubActionsKeyVaultRole
+  ]
 }
 
 // Outputs

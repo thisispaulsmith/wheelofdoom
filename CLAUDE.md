@@ -234,15 +234,18 @@ az group create --name rg-wheelofdoom-prod --location eastus
 az deployment group create \
   --resource-group rg-wheelofdoom-prod \
   --template-file infra/main.bicep \
-  --parameters infra/main.bicepparam
+  --parameters infra/main.bicepparam \
+  --parameters aadClientId='<your-aad-client-id>' aadClientSecret='<your-aad-client-secret>'
 ```
+
+**Note**: Secure parameters (`aadClientId` and `aadClientSecret`) are passed via command line. The Bicep template handles all configuration automatically.
 
 ### CI/CD Pipeline
 
 **Workflow**: `.github/workflows/azure-deploy.yml`
 
 **Three Jobs**:
-1. **deploy-infrastructure**: Deploys Bicep template (including Key Vault), grants service principal Key Vault access, stores secrets in Key Vault, configures app settings with Key Vault references
+1. **deploy-infrastructure**: Single Bicep deployment that handles everything - infrastructure, secrets, RBAC, and app settings
 2. **deploy-application**: Builds frontend/backend, deploys to Static Web Apps
 3. **run-smoke-tests**: Verifies deployment health
 
@@ -270,31 +273,33 @@ az deployment group create \
 | Authentication | Bypassed | Azure AD via `staticwebapp.config.json` |
 | API URL | Vite proxy to `localhost:7071` | Managed Functions integration |
 
-**Critical Pattern**: Secrets managed securely via Bicep Key Vault secret resources:
+**Critical Pattern**: All secrets and configuration managed in Bicep (fully declarative):
 
-1. **Bicep Secret Resource** (automatic during infrastructure deployment):
-   - Creates `Microsoft.KeyVault/vaults/secrets` resource for storage connection string
+1. **Secure Parameters** - AAD credentials passed via `@secure()` decorated parameters:
+   - `aadClientId` and `aadClientSecret` passed from GitHub secrets to Bicep
+   - `@secure()` decorator masks values in deployment history
+   - Parameters stored as Key Vault secrets: `aad-client-id` and `aad-client-secret`
+
+2. **Storage Connection String** - Created via Key Vault secret resource:
    - Uses `listKeys()` to retrieve storage account key (safe in secret resource, not in outputs)
-   - Value stored encrypted in Key Vault, never in deployment outputs/history
-   - Secret name: `storage-connection-string`
+   - Value stored encrypted in Key Vault as `storage-connection-string`
+   - Never appears in deployment outputs or history
 
-2. **GitHub Actions Workflow** (only for external secrets):
-   - Grants itself Key Vault access
-   - Stores AAD client secret from GitHub secrets into Key Vault
-   - Configures app settings with Key Vault reference syntax
+3. **RBAC Permissions** - Configured declaratively in Bicep:
+   - GitHub Actions service principal granted Key Vault Secrets Officer role
+   - Uses `Microsoft.Authorization/roleAssignments` resource
+   - No workflow CLI commands needed
 
-3. **Security Pattern**:
-   - ✅ `listKeys()` in **outputs** = BAD (plaintext exposure)
-   - ✅ `listKeys()` in **secret resource** = GOOD (encrypted in Key Vault)
+4. **App Settings** - Configured via `staticSites/config` resource in Bicep:
+   - All settings use Key Vault reference syntax: `@Microsoft.KeyVault(VaultName=...;SecretName=...)`
+   - Settings deployed atomically with infrastructure
+   - No manual configuration steps required
 
-4. **App Settings Configuration**: Use Key Vault references instead of plaintext:
-
-```bash
-az staticwebapp appsettings set \
-  --name wheelofdoom-swa \
-  --setting-names \
-    ConnectionStrings__tables="@Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)"
-```
+**Security Pattern**:
+- ✅ `listKeys()` in **outputs** = BAD (plaintext exposure)
+- ✅ `listKeys()` in **secret resource** = GOOD (encrypted in Key Vault)
+- ✅ All secrets managed in Bicep (single source of truth)
+- ✅ No workflow CLI commands for configuration
 
 This allows `src/api/Program.cs` to remain unchanged while ensuring security:
 ```csharp
@@ -302,12 +307,14 @@ builder.AddAzureTableServiceClient("tables");  // Works in both environments!
 ```
 
 **Security Benefits**:
-- ✅ Storage connection string never leaves Azure (handled entirely in Bicep)
-- ✅ No secrets in Bicep outputs or deployment history
-- ✅ No secrets in workflow logs
-- ✅ RBAC-controlled access to Key Vault
-- ✅ Audit logs for all secret access
-- ✅ Encryption at rest and in transit
+- ✅ **Fully declarative** - All secrets and configuration in Bicep
+- ✅ **No workflow steps** - Single deployment handles everything
+- ✅ **Atomic deployment** - Settings deployed with infrastructure
+- ✅ **Secure parameters** - `@secure()` masks values in history
+- ✅ **No secrets in outputs** - All secrets in Key Vault only
+- ✅ **RBAC as code** - Permission grants defined in Bicep
+- ✅ **Audit logs** - All secret access logged
+- ✅ **Encryption** - At rest and in transit
 
 ### Deployment Workflow Steps
 
