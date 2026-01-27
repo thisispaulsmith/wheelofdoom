@@ -5,8 +5,7 @@ on:
     paths:
       - 'infra/**'
       - '.github/workflows/pr-infrastructure-validate.yml'
-    paths-ignore:
-      - 'infra/**/*.md'
+      - '!infra/**/*.md'
 
 permissions:
   id-token: write
