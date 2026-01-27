@@ -1,0 +1,127 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infrastructure-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write  # For posting deployment summary
+
+env:
+  AZURE_RESOURCE_GROUP: rg-wheelofdoom
+
+jobs:
+  infrastructure-what-if:
+    name: Preview Infrastructure Changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run What-If Analysis
+        id: whatif
+        run: |
+          echo "Running what-if analysis to preview changes..."
+          az deployment group what-if \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --template-file ./infra/main.bicep \
+            --parameters ./infra/main.bicepparam \
+            --parameters aadClientId='${{ secrets.AAD_CLIENT_ID }}' \
+                         aadClientSecret='${{ secrets.AAD_CLIENT_SECRET }}' \
+            --no-pretty-print
+
+  deploy-infrastructure:
+    name: Deploy Azure Infrastructure
+    needs: infrastructure-what-if
+    runs-on: ubuntu-latest
+    outputs:
+      static-web-app-name: ${{ steps.deploy-infra.outputs.staticWebAppName }}
+      key-vault-name: ${{ steps.deploy-infra.outputs.keyVaultName }}
+      storage-account-name: ${{ steps.deploy-infra.outputs.storageAccountName }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Bicep Template
+        id: deploy-infra
+        uses: azure/arm-deploy@v2
+        with:
+          scope: resourcegroup
+          resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
+          template: ./infra/main.bicep
+          parameters: >
+            ./infra/main.bicepparam
+            aadClientId=${{ secrets.AAD_CLIENT_ID }}
+            aadClientSecret=${{ secrets.AAD_CLIENT_SECRET }}
+          failOnStdErr: false
+
+      - name: Deployment Summary
+        run: |
+          echo "## Infrastructure Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Static Web App:** ${{ steps.deploy-infra.outputs.staticWebAppName }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Key Vault:** ${{ steps.deploy-infra.outputs.keyVaultName }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Storage Account:** ${{ steps.deploy-infra.outputs.storageAccountName }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** ${{ env.AZURE_RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
+
+  verify-infrastructure:
+    name: Verify Infrastructure Deployment
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Verify Static Web App
+        run: |
+          echo "Verifying Static Web App deployment..."
+          az staticwebapp show \
+            --name ${{ needs.deploy-infrastructure.outputs.static-web-app-name }} \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --query "{name:name,status:properties.status,url:properties.defaultHostname}" \
+            --output table
+
+      - name: Verify Key Vault
+        run: |
+          echo "Verifying Key Vault secrets..."
+          az keyvault secret list \
+            --vault-name ${{ needs.deploy-infrastructure.outputs.key-vault-name }} \
+            --query "[].{name:name,enabled:attributes.enabled}" \
+            --output table
+
+      - name: Verify Storage Tables
+        run: |
+          echo "Verifying Table Storage..."
+          az storage table list \
+            --account-name ${{ needs.deploy-infrastructure.outputs.storage-account-name }} \
+            --query "[].{name:name}" \
+            --output table

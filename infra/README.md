@@ -162,43 +162,116 @@ az storage table list \
 
 ## GitHub Actions Integration
 
-The project includes automated workflows that require the same service principal permissions documented in **Step 3**.
+The project includes automated CI/CD workflows that deploy infrastructure and applications separately.
+
+### Workflow Architecture
+
+```
+Pull Request
+│
+├─> pr-tests.yml (run tests)
+├─> pr-infrastructure-validate.yml (validate infra changes)
+└─> pr-deploy.yml (deploy to staging environment)
+
+Merge to Master
+│
+├─> infrastructure-deploy.yml (deploy infra if infra/** changed)
+└─> azure-deploy.yml (deploy app if src/** changed)
+```
+
+### Infrastructure Deployment (Production)
+
+**Workflow:** `.github/workflows/infrastructure-deploy.yml`
+
+**Triggers:**
+- Push to `master` when `infra/**` files change
+- Manual via `workflow_dispatch`
+
+**Process:**
+1. Runs what-if analysis to preview changes
+2. Deploys Bicep template to Azure
+3. Verifies infrastructure (Static Web App, Key Vault, Storage)
+4. Outputs deployment summary
+
+**Required Permissions:** Contributor + User Access Administrator
+
+### Application Deployment (Production)
+
+**Workflow:** `.github/workflows/azure-deploy.yml`
+
+**Triggers:**
+- Push to `master` when `src/**` files change
+- Manual via `workflow_dispatch`
+
+**Process:**
+1. Builds frontend (React + Vite)
+2. Builds backend (.NET Azure Functions)
+3. Deploys to Azure Static Web Apps
+4. Runs smoke tests
+
+**Required Secrets:**
+- `AZURE_STATIC_WEB_APPS_API_TOKEN` - Deployment token (see Configuration After Deployment)
+- Standard Azure credentials (same as infrastructure deployment)
 
 ### PR Infrastructure Validation
 
-When PRs modify `infra/**` files, the `pr-infrastructure-validate.yml` workflow automatically:
+**Workflow:** `.github/workflows/pr-infrastructure-validate.yml`
+
+**Triggers:** PRs modifying `infra/**` files
+
+**Process:**
 1. Lints Bicep templates
 2. Validates template structure
-3. Runs `az deployment group what-if` to preview infrastructure changes
-4. Posts results as a PR comment
+3. Runs `az deployment group what-if` to preview changes
+4. Posts results as PR comment
 
-**Required Permissions:** Contributor + User Access Administrator (to validate role assignments)
+**Required Permissions:** Contributor + User Access Administrator
 
 ### PR Preview Deployments
 
-When PRs modify `src/**` or `infra/**` files, the `pr-deploy.yml` workflow automatically:
+**Workflow:** `.github/workflows/pr-deploy.yml`
+
+**Triggers:** PRs modifying `src/**` or `infra/**` files
+
+**Process:**
 1. Builds frontend and backend
 2. Deploys to Azure Static Web Apps staging environment
-3. Posts preview URL as a PR comment
-4. Auto-deletes staging environment when PR is closed/merged
+3. Posts preview URL as PR comment
+4. Auto-deletes staging environment when PR closes
 
-**Required Permissions:** Contributor + User Access Administrator (same as production deployment)
+**Required Permissions:** Contributor + User Access Administrator
 
-**Note:** Both workflows use the same service principal configured in GitHub Secrets (`AZURE_CLIENT_ID`). The permissions granted in **Step 3** enable both production and PR deployments.
+### Permission Summary
+
+All workflows use the same service principal configured in GitHub Secrets (`AZURE_CLIENT_ID`). The permissions granted in **Step 3** enable all workflows.
 
 ## Configuration After Deployment
 
-### 1. Get Static Web Apps Deployment Token (One-time Setup)
+### 1. Get Static Web Apps Deployment Token (REQUIRED for App Deployment)
+
+After infrastructure deployment completes, retrieve the Static Web App deployment token:
 
 ```bash
 az staticwebapp secrets list \
-  --name wheelofdoom-swa \
-  --resource-group rg-wheelofdoom-prod \
+  --name swa-wheelofdoom \
+  --resource-group rg-wheelofdoom \
   --query "properties.apiKey" \
   --output tsv
 ```
 
-Save this token as `AZURE_STATIC_WEB_APPS_API_TOKEN` in GitHub secrets.
+**Add this token to GitHub Secrets:**
+1. Go to your GitHub repository → **Settings** → **Secrets and variables** → **Actions**
+2. Click **New repository secret**
+3. Name: `AZURE_STATIC_WEB_APPS_API_TOKEN`
+4. Value: Paste the token from the command above
+5. Click **Add secret**
+
+**Why this is required:**
+- The `azure-deploy.yml` workflow uses this token to deploy the application to Static Web Apps
+- The `pr-deploy.yml` workflow uses this token to deploy PR preview environments
+- This token is NOT managed by Bicep because it's retrieved from Azure after the Static Web App is created
+
+**Note:** This is a one-time setup. The token remains valid unless you regenerate it.
 
 ### 2. How Secrets Are Managed (Fully Automated)
 

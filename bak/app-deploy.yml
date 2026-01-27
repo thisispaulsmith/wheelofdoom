@@ -1,9 +1,12 @@
-name: Deploy to Azure
+name: Deploy Application to Azure
 
 on:
   push:
     branches:
       - master
+    paths:
+      - 'src/**'
+      - '.github/workflows/azure-deploy.yml'
   workflow_dispatch:
 
 permissions:
@@ -11,42 +14,12 @@ permissions:
   contents: read
 
 env:
-  AZURE_RESOURCE_GROUP: rg-wheelofdoom-prod
+  AZURE_RESOURCE_GROUP: rg-wheelofdoom
+  STATIC_WEB_APP_NAME: swa-wheelofdoom
 
 jobs:
-  deploy-infrastructure:
-    name: Deploy Azure Infrastructure
-    runs-on: ubuntu-latest
-    outputs:
-      static-web-app-name: ${{ steps.deploy-infra.outputs.staticWebAppName }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Deploy Bicep Template
-        id: deploy-infra
-        uses: azure/arm-deploy@v2
-        with:
-          scope: resourcegroup
-          resourceGroupName: ${{ env.AZURE_RESOURCE_GROUP }}
-          template: ./infra/main.bicep
-          parameters: >
-            ./infra/main.bicepparam
-            aadClientId=${{ secrets.AAD_CLIENT_ID }}
-            aadClientSecret=${{ secrets.AAD_CLIENT_SECRET }}
-          failOnStdErr: false
-
   deploy-application:
     name: Build and Deploy Application
-    needs: deploy-infrastructure
     runs-on: ubuntu-latest
 
     steps:
@@ -98,9 +71,16 @@ jobs:
           skip_app_build: true
           skip_api_build: true
 
+      - name: Deployment Summary
+        run: |
+          echo "## Application Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Application URL:** https://${{ env.STATIC_WEB_APP_NAME }}.azurestaticapps.net" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** ${{ env.AZURE_RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
+
   run-smoke-tests:
     name: Run Smoke Tests
-    needs: [deploy-infrastructure, deploy-application]
+    needs: deploy-application
     runs-on: ubuntu-latest
 
     steps:
@@ -112,7 +92,7 @@ jobs:
 
       - name: Test Static Web App endpoint
         run: |
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://${{ needs.deploy-infrastructure.outputs.static-web-app-name }}.azurestaticapps.net)
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.STATIC_WEB_APP_NAME }}.azurestaticapps.net)
           if [ $RESPONSE -eq 200 ] || [ $RESPONSE -eq 401 ]; then
             echo "✅ Static Web App is responding (HTTP $RESPONSE)"
           else

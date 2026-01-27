@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'src/**'
-      - 'infra/**'
       - '.github/workflows/pr-deploy.yml'
 
 permissions:
