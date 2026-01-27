@@ -9,6 +9,6 @@ param githubActionsPrincipalId = '80b80aad-1520-4322-8eed-dc67b953a5dd' // Repla
 
 // Secure parameters (AAD credentials) are passed via command line
 // These are NOT stored in this file for security reasons
-param aadClientId = '' // Passed from GitHub secrets during workflow execution
-param aadClientSecret = '' // Passed from GitHub secrets during workflow execution
+param aadClientId = '<Replace>' // Passed from GitHub secrets during workflow execution
+param aadClientSecret = '<Replace>' // Passed from GitHub secrets during workflow execution
 

@@ -126,6 +126,9 @@ resource storageConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-0
   properties: {
     value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
   }
+  dependsOn: [
+    githubActionsKeyVaultRole
+  ]
 }
 
 // Store AAD client ID as Key Vault secret
@@ -135,6 +138,9 @@ resource aadClientIdSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   properties: {
     value: aadClientId
   }
+  dependsOn: [
+    githubActionsKeyVaultRole
+  ]
 }
 
 // Store AAD client secret as Key Vault secret
@@ -144,6 +150,9 @@ resource aadClientSecretSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = 
   properties: {
     value: aadClientSecret
   }
+  dependsOn: [
+    githubActionsKeyVaultRole
+  ]
 }
 
 // Grant GitHub Actions service principal Key Vault Secrets Officer role

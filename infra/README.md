@@ -46,7 +46,7 @@ The Bicep template (`main.bicep`) provisions the following Azure resources:
 ```bash
 az group create \
   --name rg-wheelofdoom \
-  --location eastus
+  --location westeaurope
 ```
 
 ### Step 2: Update Parameters
@@ -54,7 +54,6 @@ az group create \
 Edit `main.bicepparam` and replace placeholders:
 - `<YOUR_TENANT_ID>` - Your Azure AD tenant ID (find at portal.azure.com → Azure Active Directory → Overview)
 - `<GITHUB_ACTIONS_SP_OBJECT_ID>` - Service principal object ID for GitHub Actions (see below)
-- `storageAccountName` - Must be globally unique (3-24 chars, lowercase/numbers only)
 
 **Get GitHub Actions Service Principal Object ID:**
 ```bash
