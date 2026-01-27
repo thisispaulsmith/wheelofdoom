@@ -46,7 +46,7 @@ The Bicep template (`main.bicep`) provisions the following Azure resources:
 ```bash
 az group create \
   --name rg-wheelofdoom \
-  --location westeaurope
+  --location eastus
 ```
 
 ### Step 2: Update Parameters
@@ -85,13 +85,13 @@ Option 1: Two Separate Roles (Recommended - Principle of Least Privilege)
 az role assignment create \
   --assignee <AZURE_CLIENT_ID> \
   --role Contributor \
-  --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-wheelofdoom-prod
+  --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-wheelofdoom
 
 # Grant User Access Administrator role
 az role assignment create \
   --assignee <AZURE_CLIENT_ID> \
   --role "User Access Administrator" \
-  --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-wheelofdoom-prod
+  --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-wheelofdoom
 ```
 
 Option 2: Single Owner Role (Simpler but More Permissions)
@@ -100,14 +100,14 @@ Option 2: Single Owner Role (Simpler but More Permissions)
 az role assignment create \
   --assignee <AZURE_CLIENT_ID> \
   --role Owner \
-  --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-wheelofdoom-prod
+  --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-wheelofdoom
 ```
 
 **Verify Permissions:**
 ```bash
 az role assignment list \
   --assignee <AZURE_CLIENT_ID> \
-  --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-wheelofdoom-prod \
+  --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/rg-wheelofdoom \
   --output table
 ```
 
@@ -125,7 +125,7 @@ The deployment now requires passing AAD credentials as secure parameters:
 
 ```bash
 az deployment group create \
-  --resource-group rg-wheelofdoom-prod \
+  --resource-group rg-wheelofdoom \
   --template-file main.bicep \
   --parameters main.bicepparam \
   --parameters aadClientId='<your-aad-client-id>' aadClientSecret='<your-aad-client-secret>'
@@ -145,38 +145,38 @@ az deployment group create \
 ```bash
 # List all resources in the resource group
 az resource list \
-  --resource-group rg-wheelofdoom-prod \
+  --resource-group rg-wheelofdoom \
   --output table
 
 # Check Static Web App details
 az staticwebapp show \
-  --name wheelofdoom-swa \
-  --resource-group rg-wheelofdoom-prod
+  --name swa-wheelofdoom \
+  --resource-group rg-wheelofdoom
 
 # Check Storage Account tables
 az storage table list \
-  --account-name wheelodomstorage \
+  --account-name stowheelofdoom \
   --output table
 ```
 
 ## GitHub Actions Integration
 
-The project includes automated CI/CD workflows that deploy infrastructure and applications separately.
+The project includes automated CI/CD workflows for infrastructure deployment and validation.
 
 ### Workflow Architecture
 
 ```
 Pull Request
 │
-├─> pr-tests.yml (run tests)
-├─> pr-infrastructure-validate.yml (validate infra changes)
-└─> pr-deploy.yml (deploy to staging environment)
+├─> pr-tests.yml (run frontend & backend tests)
+└─> pr-infrastructure-validate.yml (validate infra changes if infra/** modified)
 
 Merge to Master
 │
-├─> infrastructure-deploy.yml (deploy infra if infra/** changed)
-└─> azure-deploy.yml (deploy app if src/** changed)
+└─> infrastructure-deploy.yml (deploy infra if infra/** changed)
 ```
+
+**Note**: Application deployment (frontend/backend) is currently manual. Automated application deployment workflows may be added in the future.
 
 ### Infrastructure Deployment (Production)
 
@@ -192,25 +192,14 @@ Merge to Master
 3. Verifies infrastructure (Static Web App, Key Vault, Storage)
 4. Outputs deployment summary
 
-**Required Permissions:** Contributor + User Access Administrator
+**Required GitHub Secrets:**
+1. `AZURE_CLIENT_ID` - Service principal client ID
+2. `AZURE_TENANT_ID` - Azure AD tenant ID
+3. `AZURE_SUBSCRIPTION_ID` - Azure subscription ID
+4. `AAD_CLIENT_ID` - Azure AD app registration client ID (for user authentication)
+5. `AAD_CLIENT_SECRET` - Azure AD app registration client secret (for user authentication)
 
-### Application Deployment (Production)
-
-**Workflow:** `.github/workflows/azure-deploy.yml`
-
-**Triggers:**
-- Push to `master` when `src/**` files change
-- Manual via `workflow_dispatch`
-
-**Process:**
-1. Builds frontend (React + Vite)
-2. Builds backend (.NET Azure Functions)
-3. Deploys to Azure Static Web Apps
-4. Runs smoke tests
-
-**Required Secrets:**
-- `AZURE_STATIC_WEB_APPS_API_TOKEN` - Deployment token (see Configuration After Deployment)
-- Standard Azure credentials (same as infrastructure deployment)
+**Required Permissions:** Contributor + User Access Administrator (see Step 3)
 
 ### PR Infrastructure Validation
 
@@ -226,53 +215,26 @@ Merge to Master
 
 **Required Permissions:** Contributor + User Access Administrator
 
-### PR Preview Deployments
+### PR Testing
 
-**Workflow:** `.github/workflows/pr-deploy.yml`
+**Workflow:** `.github/workflows/pr-tests.yml`
 
-**Triggers:** PRs modifying `src/**` or `infra/**` files
+**Triggers:** All pull requests
 
 **Process:**
-1. Builds frontend and backend
-2. Deploys to Azure Static Web Apps staging environment
-3. Posts preview URL as PR comment
-4. Auto-deletes staging environment when PR closes
+1. Runs frontend tests (Vitest)
+2. Runs backend tests (xUnit)
+3. Reports test results
 
-**Required Permissions:** Contributor + User Access Administrator
+**Required Permissions:** None (runs on GitHub-hosted runners without Azure access)
 
 ### Permission Summary
 
-All workflows use the same service principal configured in GitHub Secrets (`AZURE_CLIENT_ID`). The permissions granted in **Step 3** enable all workflows.
+Infrastructure workflows use the same service principal configured in GitHub Secrets (`AZURE_CLIENT_ID`). The permissions granted in **Step 3** enable all infrastructure workflows.
 
 ## Configuration After Deployment
 
-### 1. Get Static Web Apps Deployment Token (REQUIRED for App Deployment)
-
-After infrastructure deployment completes, retrieve the Static Web App deployment token:
-
-```bash
-az staticwebapp secrets list \
-  --name swa-wheelofdoom \
-  --resource-group rg-wheelofdoom \
-  --query "properties.apiKey" \
-  --output tsv
-```
-
-**Add this token to GitHub Secrets:**
-1. Go to your GitHub repository → **Settings** → **Secrets and variables** → **Actions**
-2. Click **New repository secret**
-3. Name: `AZURE_STATIC_WEB_APPS_API_TOKEN`
-4. Value: Paste the token from the command above
-5. Click **Add secret**
-
-**Why this is required:**
-- The `azure-deploy.yml` workflow uses this token to deploy the application to Static Web Apps
-- The `pr-deploy.yml` workflow uses this token to deploy PR preview environments
-- This token is NOT managed by Bicep because it's retrieved from Azure after the Static Web App is created
-
-**Note:** This is a one-time setup. The token remains valid unless you regenerate it.
-
-### 2. How Secrets Are Managed (Fully Automated)
+### 1. How Secrets Are Managed (Fully Automated)
 
 **All secrets are now managed entirely in Bicep** - no manual configuration or workflow steps required!
 
@@ -302,12 +264,12 @@ az staticwebapp secrets list \
 **Verify Configuration:**
 ```bash
 # Check Key Vault secrets (should show 3 secrets)
-az keyvault secret list --vault-name wheelofdoom-kv --output table
+az keyvault secret list --vault-name kv-wheelofdoom --output table
 
 # Check Static Web App settings (should show Key Vault references)
 az staticwebapp appsettings list \
-  --name wheelofdoom-swa \
-  --resource-group rg-wheelofdoom-prod
+  --name swa-wheelofdoom \
+  --resource-group rg-wheelofdoom
 ```
 
 **Security Benefits:**
@@ -321,7 +283,7 @@ az staticwebapp appsettings list \
 
 **Important**: `ConnectionStrings__tables` matches Aspire's expected configuration format, allowing the backend code to work unchanged in both development (Aspire) and production (Azure Static Web Apps).
 
-### 3. Configure Azure AD Redirect URI
+### 2. Configure Azure AD Redirect URI
 
 After deployment, update your Azure AD app registration:
 1. Go to Azure Portal → Azure Active Directory → App registrations
@@ -351,7 +313,7 @@ View outputs:
 
 ```bash
 az deployment group show \
-  --resource-group rg-wheelofdoom-prod \
+  --resource-group rg-wheelofdoom \
   --name <deployment-name> \
   --query properties.outputs
 ```
@@ -368,7 +330,7 @@ az deployment group show \
 
 ```bash
 az consumption budget create \
-  --resource-group rg-wheelofdoom-prod \
+  --resource-group rg-wheelofdoom \
   --name "WheelOfDoom-Monthly-Budget" \
   --amount 20 \
   --time-grain Monthly \
@@ -385,7 +347,7 @@ az consumption budget create \
 
 ```bash
 az consumption usage list \
-  --resource-group rg-wheelofdoom-prod \
+  --resource-group rg-wheelofdoom \
   --start-date 2026-01-01 \
   --end-date 2026-01-31
 ```
@@ -396,7 +358,7 @@ To delete all resources (destructive operation):
 
 ```bash
 az group delete \
-  --name rg-wheelofdoom-prod \
+  --name rg-wheelofdoom \
   --yes \
   --no-wait
 ```
@@ -423,7 +385,7 @@ The client with object id '...' does not have permission to perform action
 az role assignment create \
   --assignee <AZURE_CLIENT_ID> \
   --role "User Access Administrator" \
-  --scope /subscriptions/<subscription-id>/resourceGroups/rg-wheelofdoom-prod
+  --scope /subscriptions/<subscription-id>/resourceGroups/rg-wheelofdoom
 ```
 
 See **Step 3: Grant Service Principal Required Permissions** above for complete setup.
@@ -437,7 +399,7 @@ Ensure your Azure CLI session or service principal has appropriate permissions:
 az role assignment create \
   --assignee <your-user-principal-name> \
   --role Contributor \
-  --scope /subscriptions/<subscription-id>/resourceGroups/rg-wheelofdoom-prod
+  --scope /subscriptions/<subscription-id>/resourceGroups/rg-wheelofdoom
 ```
 
 **For GitHub Actions deployment:**
