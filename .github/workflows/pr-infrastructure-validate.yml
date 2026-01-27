@@ -37,7 +37,7 @@ jobs:
       - name: Validate Template
         run: |
           az deployment group validate \
-            --resource-group rg-wheelofdoom-prod \
+            --resource-group rg-wheelofdoom \
             --template-file ./infra/main.bicep \
             --parameters ./infra/main.bicepparam \
             --parameters aadClientId='${{ secrets.AAD_CLIENT_ID }}' \
@@ -60,7 +60,7 @@ jobs:
         id: whatif
         run: |
           OUTPUT=$(az deployment group what-if \
-            --resource-group rg-wheelofdoom-prod \
+            --resource-group rg-wheelofdoom \
             --template-file ./infra/main.bicep \
             --parameters ./infra/main.bicepparam \
             --parameters aadClientId='${{ secrets.AAD_CLIENT_ID }}' \
