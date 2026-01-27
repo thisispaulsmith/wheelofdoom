@@ -1,0 +1,101 @@
+name: Deploy Application to Azure
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'src/**'
+      - '.github/workflows/azure-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_RESOURCE_GROUP: rg-wheelofdoom
+  STATIC_WEB_APP_NAME: swa-wheelofdoom
+
+jobs:
+  deploy-application:
+    name: Build and Deploy Application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            src/app/package-lock.json
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install root dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install frontend dependencies
+        run: cd src/app && npm ci --legacy-peer-deps
+
+      - name: Build frontend
+        run: cd src/app && npm run build
+        env:
+          CI: true
+
+      - name: Restore backend dependencies
+        run: dotnet restore WheelOfDoom.slnx
+
+      - name: Build backend
+        run: cd src/api && dotnet publish -c Release -o ./publish
+
+      - name: Deploy to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "src/app"
+          api_location: "src/api"
+          output_location: "dist"
+          skip_app_build: true
+          skip_api_build: true
+
+      - name: Deployment Summary
+        run: |
+          echo "## Application Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Application URL:** https://${{ env.STATIC_WEB_APP_NAME }}.azurestaticapps.net" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** ${{ env.AZURE_RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
+
+  run-smoke-tests:
+    name: Run Smoke Tests
+    needs: deploy-application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Wait for deployment propagation
+        run: sleep 30
+
+      - name: Test Static Web App endpoint
+        run: |
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.STATIC_WEB_APP_NAME }}.azurestaticapps.net)
+          if [ $RESPONSE -eq 200 ] || [ $RESPONSE -eq 401 ]; then
+            echo "✅ Static Web App is responding (HTTP $RESPONSE)"
+          else
+            echo "❌ Static Web App returned unexpected status: $RESPONSE"
+            exit 1
+          fi

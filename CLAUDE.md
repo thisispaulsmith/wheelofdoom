@@ -199,6 +199,290 @@ builder.Build().Run();
 4. Schedule with `oscillator.start(time)` and `oscillator.stop(time + duration)`
 5. Register callback in `src/app/src/App.jsx` during wheel interactions
 
+## Azure Deployment
+
+### Deployment Architecture
+
+The app deploys to **Azure Static Web Apps** with:
+- React frontend served as static files
+- .NET Azure Functions as managed backend (not containerized)
+- Azure Table Storage for data persistence
+- Azure AD for authentication
+
+**Key Insight**: Backend code works unchanged in both development (Aspire) and production (Azure) because `ConnectionStrings__tables` configuration matches Aspire's expected format.
+
+### Infrastructure as Code
+
+All Azure resources are defined in `infra/` directory:
+
+```
+infra/
+├── main.bicep           # Infrastructure template
+├── main.bicepparam      # Parameters (tenant ID, resource names)
+└── README.md            # Detailed deployment instructions
+```
+
+**Resources Created**:
+1. Azure Static Web App (Standard tier) - `wheelofdoom-swa`
+2. Storage Account (Standard LRS) - `wheelodomstorage`
+3. Table Service with Entries and Results tables
+4. Azure Key Vault (Standard tier) - `wheelofdoom-kv` (secure secret storage)
+
+**Deploy Infrastructure**:
+```bash
+az group create --name rg-wheelofdoom-prod --location eastus
+az deployment group create \
+  --resource-group rg-wheelofdoom-prod \
+  --template-file infra/main.bicep \
+  --parameters infra/main.bicepparam \
+  --parameters aadClientId='<your-aad-client-id>' aadClientSecret='<your-aad-client-secret>'
+```
+
+**Note**: Secure parameters (`aadClientId` and `aadClientSecret`) are passed via command line. The Bicep template handles all configuration automatically.
+
+### CI/CD Pipeline
+
+**Workflow**: `.github/workflows/azure-deploy.yml`
+
+**Three Jobs**:
+1. **deploy-infrastructure**: Single Bicep deployment that handles everything - infrastructure, secrets, RBAC, and app settings
+2. **deploy-application**: Builds frontend/backend, deploys to Static Web Apps
+3. **run-smoke-tests**: Verifies deployment health
+
+**Triggers**:
+- Automatic: Push to `master` branch
+- Manual: GitHub Actions → "Deploy to Azure" → Run workflow
+
+**Required GitHub Secrets** (7 total):
+- `AZURE_CLIENT_ID` - Service principal for deployment
+- `AZURE_TENANT_ID` - Azure AD tenant ID
+- `AZURE_SUBSCRIPTION_ID` - Azure subscription ID
+- `AZURE_RESOURCE_GROUP` - `rg-wheelofdoom-prod`
+- `AZURE_STATIC_WEB_APPS_API_TOKEN` - SWA deployment token
+- `AAD_CLIENT_ID` - Azure AD app for user authentication
+- `AAD_CLIENT_SECRET` - Azure AD app secret
+
+### Configuration Mapping
+
+**Development (Aspire)** → **Production (Azure Static Web Apps)**:
+
+| Setting | Aspire (Local) | Azure (Production) |
+|---------|----------------|-------------------|
+| Storage Connection | `ConnectionStrings__tables` from AppHost | `ConnectionStrings__tables` app setting |
+| User Identity | `"anonymous"` | `x-ms-client-principal-name` header |
+| Authentication | Bypassed | Azure AD via `staticwebapp.config.json` |
+| API URL | Vite proxy to `localhost:7071` | Managed Functions integration |
+
+**Critical Pattern**: All secrets and configuration managed in Bicep (fully declarative):
+
+1. **Secure Parameters** - AAD credentials passed via `@secure()` decorated parameters:
+   - `aadClientId` and `aadClientSecret` passed from GitHub secrets to Bicep
+   - `@secure()` decorator masks values in deployment history
+   - Parameters stored as Key Vault secrets: `aad-client-id` and `aad-client-secret`
+
+2. **Storage Connection String** - Created via Key Vault secret resource:
+   - Uses `listKeys()` to retrieve storage account key (safe in secret resource, not in outputs)
+   - Value stored encrypted in Key Vault as `storage-connection-string`
+   - Never appears in deployment outputs or history
+
+3. **RBAC Permissions** - Configured declaratively in Bicep:
+   - GitHub Actions service principal granted Key Vault Secrets Officer role
+   - Uses `Microsoft.Authorization/roleAssignments` resource
+   - No workflow CLI commands needed
+
+4. **App Settings** - Configured via `staticSites/config` resource in Bicep:
+   - All settings use Key Vault reference syntax: `@Microsoft.KeyVault(VaultName=...;SecretName=...)`
+   - Settings deployed atomically with infrastructure
+   - No manual configuration steps required
+
+**Security Pattern**:
+- ✅ `listKeys()` in **outputs** = BAD (plaintext exposure)
+- ✅ `listKeys()` in **secret resource** = GOOD (encrypted in Key Vault)
+- ✅ All secrets managed in Bicep (single source of truth)
+- ✅ No workflow CLI commands for configuration
+
+This allows `src/api/Program.cs` to remain unchanged while ensuring security:
+```csharp
+builder.AddAzureTableServiceClient("tables");  // Works in both environments!
+```
+
+**Security Benefits**:
+- ✅ **Fully declarative** - All secrets and configuration in Bicep
+- ✅ **No workflow steps** - Single deployment handles everything
+- ✅ **Atomic deployment** - Settings deployed with infrastructure
+- ✅ **Secure parameters** - `@secure()` masks values in history
+- ✅ **No secrets in outputs** - All secrets in Key Vault only
+- ✅ **RBAC as code** - Permission grants defined in Bicep
+- ✅ **Audit logs** - All secret access logged
+- ✅ **Encryption** - At rest and in transit
+
+### Deployment Workflow Steps
+
+**Frontend Build**:
+```bash
+cd src/app
+npm ci --legacy-peer-deps
+npm run build                # Outputs to src/app/dist
+```
+
+**Backend Build**:
+```bash
+cd src/api
+dotnet restore
+dotnet publish -c Release -o ./publish
+```
+
+**Deploy to Azure**:
+Uses `Azure/static-web-apps-deploy@v1` action with:
+- `app_location: "src/app"`
+- `api_location: "src/api"`
+- `output_location: "dist"`
+- `skip_app_build: true` (already built)
+- `skip_api_build: true` (already built)
+
+### Azure AD Authentication Setup
+
+**1. Create App Registration**:
+```bash
+# Azure Portal → Azure Active Directory → App registrations → New registration
+# Name: WheelOfDoom-Auth
+# Supported account types: Single tenant
+```
+
+**2. Create Client Secret**:
+```bash
+# App registration → Certificates & secrets → New client secret
+# Save as AAD_CLIENT_SECRET in GitHub secrets
+```
+
+**3. Configure Redirect URI** (after Static Web App is deployed):
+```
+Type: Web
+URI: https://wheelofdoom-swa.azurestaticapps.net/.auth/login/aad/callback
+```
+
+**4. Update Tenant ID**:
+Edit `staticwebapp.config.json` line 6 or `infra/main.bicepparam`:
+```json
+"openIdIssuer": "https://login.microsoftonline.com/<YOUR_TENANT_ID>/v2.0"
+```
+
+### Verifying Deployment
+
+**Check Infrastructure**:
+```bash
+az resource list --resource-group rg-wheelofdoom-prod --output table
+```
+
+**Check App Settings**:
+```bash
+az staticwebapp appsettings list \
+  --name wheelofdoom-swa \
+  --resource-group rg-wheelofdoom-prod
+```
+
+**Check Tables**:
+```bash
+az storage table list --account-name wheelodomstorage --output table
+```
+
+**Test Endpoints**:
+```bash
+# Should redirect to Azure AD login (401 or 302)
+curl -I https://wheelofdoom-swa.azurestaticapps.net
+
+# After authentication, test API
+curl https://wheelofdoom-swa.azurestaticapps.net/api/entries \
+  -H "Cookie: StaticWebAppsAuthCookie=..."
+```
+
+### Cost Monitoring
+
+**Monthly Budget**: $10-15
+- Azure Static Web Apps Standard: $9/month
+- Azure Functions: $0-1/month (consumption tier)
+- Azure Storage: $1-5/month
+- Azure Key Vault: ~$0.03/month (minimal operations)
+
+**Set Budget Alert**:
+```bash
+az consumption budget create \
+  --resource-group rg-wheelofdoom-prod \
+  --name "WheelOfDoom-Monthly-Budget" \
+  --amount 20 \
+  --time-grain Monthly
+```
+
+### Troubleshooting Deployment
+
+**Deployment workflow fails**:
+- Check GitHub Actions logs for specific error
+- Verify all 7 GitHub secrets are configured
+- Ensure service principal has Contributor role
+
+**Infrastructure deployment fails**:
+- Storage account name must be globally unique (3-24 chars, lowercase/numbers)
+- Check Azure CLI version: `az --version`
+- Verify resource group exists
+
+**App settings not configured**:
+- Manually set via Azure Portal → Static Web App → Configuration
+- Or run the `az staticwebapp appsettings set` command from workflow
+
+**Authentication fails**:
+- Verify `<TENANT_ID>` in `staticwebapp.config.json` is correct
+- Check redirect URI is configured in Azure AD app registration
+- Ensure `AAD_CLIENT_ID` and `AAD_CLIENT_SECRET` are set in app settings
+
+**API returns 500 errors**:
+- Check Application Insights logs in Azure Portal
+- Verify `ConnectionStrings__tables` is set correctly
+- Test storage connection: Azure Portal → Storage Account → Tables
+
+**Tables not created**:
+- Tables are auto-created by Bicep template
+- Verify via Azure Portal → Storage Account → Tables
+- Or use Azure Storage Explorer
+
+### Rollback Strategy
+
+**Revert Code**:
+```bash
+git revert HEAD
+git push origin master  # Triggers automatic redeployment
+```
+
+**Rollback Infrastructure**:
+```bash
+# Re-deploy previous working Bicep template
+az deployment group create \
+  --resource-group rg-wheelofdoom-prod \
+  --template-file infra/main.bicep.backup
+```
+
+**Emergency Stop**:
+```bash
+# Disable automatic deployments
+# Comment out 'push:' trigger in .github/workflows/azure-deploy.yml
+# Keep 'workflow_dispatch:' for manual control
+```
+
+### Local vs Production Differences
+
+**Same**:
+- Backend code (zero changes required!)
+- Frontend code
+- API contracts
+- Table Storage schema
+
+**Different**:
+- Authentication (anonymous vs Azure AD)
+- Storage backend (Azurite vs Azure Table Storage)
+- Hosting (Aspire orchestration vs Static Web Apps)
+- Observability (Aspire Dashboard vs Application Insights)
+
+**Key Takeaway**: Configuration-driven architecture allows same codebase to run in both environments without conditional logic.
+
 ## Important Gotchas
 
 ### Aspire Port Mapping Issues
@@ -260,4 +544,4 @@ No manual CORS configuration needed locally - Vite's proxy handles all `/api/*` 
 
 ---
 
-*Last updated: 2026-01-22*
+*Last updated: 2026-01-26*
