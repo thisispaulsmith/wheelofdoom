@@ -1,4 +1,4 @@
-name: PR Infrastructure Validation
+name: Infrastructure Validation
 
 on:
   pull_request:
