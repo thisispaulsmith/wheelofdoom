@@ -1,7 +1,7 @@
 using './main.bicep'
 
 param staticWebAppName = 'swa-wheelofdoom'
-param storageAccountName = 'stowheelodomstorage' // Must be unique, 3-24 chars, lowercase/numbers only
+param storageAccountName = 'stowheelofdoom' // Must be unique, 3-24 chars, lowercase/numbers only
 param keyVaultName = 'kv-wheelofdoom' // Must be globally unique, 3-24 chars
 param tenantId = '3edc4486-5878-46a9-a974-2a7787926f35' // Replace with actual tenant ID
 param environmentName = 'production'
