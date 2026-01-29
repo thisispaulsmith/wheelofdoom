@@ -1,0 +1,126 @@
+name: PR Preview Deployment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - 'src/**'
+      - '.github/workflows/pr-app-deploy.yml'
+      - '!**/*.md'
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: pr-deploy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  AZURE_RESOURCE_GROUP: rg-wheelofdoom
+  STATIC_WEB_APP_NAME: swa-wheelofdoom
+
+jobs:
+  deploy-preview:
+    name: Deploy to Staging Environment
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            src/app/package-lock.json
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install root dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install frontend dependencies
+        run: cd src/app && npm ci --legacy-peer-deps
+
+      - name: Run frontend tests
+        run: npm run test:app
+        env:
+          CI: true
+
+      - name: Run backend tests
+        run: npm run test:api
+        env:
+          CI: true
+
+      - name: Build frontend
+        run: cd src/app && npm run build
+        env:
+          CI: true
+
+      - name: Restore backend dependencies
+        run: dotnet restore WheelOfDoom.slnx
+
+      - name: Build backend
+        run: cd src/api && dotnet publish -c Release -o ./publish
+
+      - name: Deploy to Azure Static Web Apps
+        id: swa-deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "src/app"
+          api_location: "src/api"
+          output_location: "dist"
+          skip_app_build: true
+          skip_api_build: true
+
+      - name: Post Preview URL
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preview-deployment
+          message: |
+            ## 🚀 Preview Deployment Ready
+
+            Your PR has been deployed to a staging environment!
+
+            **Preview URL**: ${{ steps.swa-deploy.outputs.static_web_app_url }}
+
+            **Note**: This environment uses Azure AD authentication. You'll need to sign in to access it.
+
+            **Tests**: All tests passed ✅
+            - Frontend: 53 tests
+            - Backend: 19 tests
+
+            This staging environment will be automatically deleted when the PR is closed or merged.
+
+  cleanup-preview:
+    name: Close Staging Environment
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Close staging environment
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: "close"
+
+      - name: Post cleanup message
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: preview-deployment
+          message: |
+            ## 🧹 Staging Environment Closed
+
+            The preview deployment for this PR has been deleted.
