@@ -21,6 +21,7 @@ concurrency:
 env:
   AZURE_RESOURCE_GROUP: rg-wheelofdoom
   STATIC_WEB_APP_NAME: swa-wheelofdoom
+  FUNCTION_APP_NAME: func-wheelofdoom
 
 jobs:
   test-and-deploy:
@@ -45,6 +46,13 @@ jobs:
         with:
           dotnet-version: '9.0.x'
 
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Install root dependencies
         run: npm ci --legacy-peer-deps
 
@@ -66,6 +74,18 @@ jobs:
         env:
           CI: true
 
+      - name: Build backend
+        run: |
+          dotnet restore WheelOfDoom.slnx
+          cd src/api
+          dotnet publish -c Release -o ./publish
+
+      - name: Deploy Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.FUNCTION_APP_NAME }}
+          package: src/api/publish
+
       - name: Deploy to Azure Static Web Apps
         id: swa-deploy
         uses: Azure/static-web-apps-deploy@v1
@@ -74,7 +94,6 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "src/app"
-          api_location: "src/api"
           output_location: "dist"
           skip_app_build: true
 
@@ -84,6 +103,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Application URL:** https://${{ env.STATIC_WEB_APP_NAME }}.azurestaticapps.net" >> $GITHUB_STEP_SUMMARY
           echo "**Resource Group:** ${{ env.AZURE_RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** API requests to /api/* are automatically routed to the linked Function App backend" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Deployed At:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
 
@@ -96,7 +117,7 @@ jobs:
       - name: Wait for deployment propagation
         run: sleep 30
 
-      - name: Test root endpoint
+      - name: Test frontend endpoint
         run: |
           echo "Testing Static Web App endpoint..."
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.STATIC_WEB_APP_NAME }}.azurestaticapps.net)
@@ -109,9 +130,9 @@ jobs:
             exit 1
           fi
 
-      - name: Test API endpoint
+      - name: Test API endpoint (via Static Web App proxy)
         run: |
-          echo "Testing API endpoint..."
+          echo "Testing API endpoint through Static Web App..."
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.STATIC_WEB_APP_NAME }}.azurestaticapps.net/api/entries)
 
           if [ $RESPONSE -eq 401 ]; then

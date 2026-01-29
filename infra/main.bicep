@@ -27,7 +27,87 @@ param aadClientSecret string
 @description('GitHub Actions service principal object ID for Key Vault access')
 param githubActionsPrincipalId string
 
-// Azure Static Web App
+@description('Name of the Function App')
+param functionAppName string
+
+// App Service Plan for Azure Functions (Consumption tier)
+resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
+  name: '${functionAppName}-plan'
+  location: location
+  sku: {
+    name: 'Y1'
+    tier: 'Dynamic'
+  }
+  properties: {
+    reserved: true  // Required for Linux
+  }
+  tags: {
+    environment: environmentName
+    application: 'WheelOfDoom'
+  }
+}
+
+// Azure Function App
+resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
+  name: functionAppName
+  location: location
+  kind: 'functionapp,linux'
+  properties: {
+    serverFarmId: appServicePlan.id
+    reserved: true
+    siteConfig: {
+      linuxFxVersion: 'DOTNET-ISOLATED|9.0'
+      ftpsState: 'Disabled'
+      minTlsVersion: '1.2'
+      cors: {
+        allowedOrigins: [
+          'https://${staticWebAppName}.azurestaticapps.net'
+        ]
+        supportCredentials: false
+      }
+      appSettings: [
+        {
+          name: 'AzureWebJobsStorage'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=storage-connection-string)'
+        }
+        {
+          name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=storage-connection-string)'
+        }
+        {
+          name: 'WEBSITE_CONTENTSHARE'
+          value: toLower(functionAppName)
+        }
+        {
+          name: 'FUNCTIONS_EXTENSION_VERSION'
+          value: '~4'
+        }
+        {
+          name: 'FUNCTIONS_WORKER_RUNTIME'
+          value: 'dotnet-isolated'
+        }
+        {
+          name: 'ConnectionStrings__tables'
+          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=storage-connection-string)'
+        }
+        {
+          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
+          value: ''  // Optional: Add Application Insights later
+        }
+      ]
+    }
+    httpsOnly: true
+  }
+  tags: {
+    environment: environmentName
+    application: 'WheelOfDoom'
+  }
+  dependsOn: [
+    storageConnectionStringSecret
+  ]
+}
+
+// Azure Static Web App (Frontend only)
 resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
   name: staticWebAppName
   location: location
@@ -40,8 +120,8 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
     branch: 'master'
     buildProperties: {
       appLocation: 'src/app'
-      apiLocation: 'src/api'
       outputLocation: 'dist'
+      // apiLocation removed - using linked backend Function App
     }
     stagingEnvironmentPolicy: 'Enabled'
     allowConfigFileUpdates: true
@@ -50,6 +130,16 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
   tags: {
     environment: environmentName
     application: 'WheelOfDoom'
+  }
+}
+
+// Link Function App as backend to Static Web App
+resource linkedBackend 'Microsoft.Web/staticSites/linkedBackends@2023-12-01' = {
+  parent: staticWebApp
+  name: functionAppName
+  properties: {
+    backendResourceId: functionApp.id
+    region: location
   }
 }
 
@@ -176,14 +266,13 @@ resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
   properties: {
     AAD_CLIENT_ID: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=aad-client-id)'
     AAD_CLIENT_SECRET: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=aad-client-secret)'
-    AzureWebJobsStorage: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=storage-connection-string)'
-    ConnectionStrings__tables: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=storage-connection-string)'
+    FUNCTION_APP_URL: 'https://${functionApp.properties.defaultHostName}'
   }
   dependsOn: [
     aadClientIdSecret
     aadClientSecretSecret
-    storageConnectionStringSecret
     githubActionsKeyVaultRole
+    functionApp
   ]
 }
 
@@ -191,6 +280,9 @@ resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
 output staticWebAppDefaultHostName string = staticWebApp.properties.defaultHostname
 output staticWebAppId string = staticWebApp.id
 output staticWebAppName string = staticWebApp.name
+output functionAppName string = functionApp.name
+output functionAppDefaultHostName string = functionApp.properties.defaultHostName
+output functionAppId string = functionApp.id
 output storageAccountName string = storageAccount.name
 output storageAccountId string = storageAccount.id
 output tableEndpoint string = storageAccount.properties.primaryEndpoints.table

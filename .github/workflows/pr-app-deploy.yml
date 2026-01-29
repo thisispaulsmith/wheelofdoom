@@ -20,6 +20,7 @@ concurrency:
 env:
   AZURE_RESOURCE_GROUP: rg-wheelofdoom
   STATIC_WEB_APP_NAME: swa-wheelofdoom
+  FUNCTION_APP_NAME: func-wheelofdoom
 
 jobs:
   deploy-preview:
@@ -74,7 +75,6 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           app_location: "src/app"
-          api_location: "src/api"
           output_location: "dist"
           skip_app_build: true
 
@@ -89,7 +89,10 @@ jobs:
 
             **Preview URL**: ${{ steps.swa-deploy.outputs.static_web_app_url }}
 
-            **Note**: This environment uses Azure AD authentication. You'll need to sign in to access it.
+            **Note**:
+            - This preview uses Azure AD authentication
+            - Frontend is deployed to a staging environment
+            - API calls to `/api/*` are automatically routed to the production Function App backend via the Static Web App's linked backend
 
             **Tests**: All tests passed ✅
             - Frontend: 53 tests
