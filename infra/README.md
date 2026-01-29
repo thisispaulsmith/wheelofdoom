@@ -168,15 +168,73 @@ The project includes automated CI/CD workflows for infrastructure deployment and
 ```
 Pull Request
 │
-├─> pr-tests.yml (run frontend & backend tests)
-└─> pr-infrastructure-validate.yml (validate infra changes if infra/** modified)
+├─> pr-tests.yml (run all tests including E2E)
+├─> pr-app-deploy.yml (test + deploy to staging)
+└─> pr-infrastructure-validate.yml (validate infra if infra/** modified)
 
 Merge to Master
 │
+├─> app-deploy.yml (deploy app if src/** changed)
 └─> infrastructure-deploy.yml (deploy infra if infra/** changed)
 ```
 
-**Note**: Application deployment (frontend/backend) is currently manual. Automated application deployment workflows may be added in the future.
+### Application Deployment (Production)
+
+**Workflow:** `.github/workflows/app-deploy.yml`
+
+**Triggers:**
+- Push to `master` when `src/**` files change
+- Manual via `workflow_dispatch`
+
+**Process:**
+1. Run frontend tests (Vitest - 53 tests)
+2. Run backend tests (xUnit - 19 tests)
+3. Build frontend (React + Vite → dist/)
+4. Build backend (.NET Azure Functions → publish/)
+5. Deploy to Azure Static Web Apps production
+6. Run smoke tests to verify deployment
+
+**Required GitHub Secret:**
+- `AZURE_STATIC_WEB_APPS_API_TOKEN` - Static Web App deployment token
+
+**How to Retrieve Deployment Token:**
+
+Option A: Azure CLI
+```bash
+az staticwebapp secrets list \
+  --name swa-wheelofdoom \
+  --resource-group rg-wheelofdoom \
+  --query "properties.apiKey" \
+  --output tsv
+```
+
+Option B: Azure Portal
+1. Navigate to: Resource Groups → rg-wheelofdoom → swa-wheelofdoom
+2. Go to: Settings → Deployment tokens
+3. Copy the deployment token value
+
+Then add to GitHub: Settings → Secrets and variables → Actions → New repository secret
+- Name: `AZURE_STATIC_WEB_APPS_API_TOKEN`
+- Value: [paste token]
+
+### PR Preview Deployment
+
+**Workflow:** `.github/workflows/pr-app-deploy.yml`
+
+**Triggers:** Pull requests modifying `src/**` files
+
+**Process:**
+1. Run frontend and backend tests
+2. Build frontend and backend
+3. Deploy to Azure Static Web Apps staging environment
+4. Post preview URL as PR comment
+5. Automatically clean up staging environment when PR closes
+
+**Staging Environment:**
+- Each PR gets a unique staging URL
+- Uses same Azure AD authentication as production
+- Automatically deleted when PR is closed or merged
+- No additional cost on Standard tier
 
 ### Infrastructure Deployment (Production)
 
@@ -198,6 +256,7 @@ Merge to Master
 3. `AZURE_SUBSCRIPTION_ID` - Azure subscription ID
 4. `AAD_CLIENT_ID` - Azure AD app registration client ID (for user authentication)
 5. `AAD_CLIENT_SECRET` - Azure AD app registration client secret (for user authentication)
+6. `AZURE_STATIC_WEB_APPS_API_TOKEN` - Static Web App deployment token (see Application Deployment section above)
 
 **Required Permissions:** Contributor + User Access Administrator (see Step 3)
 

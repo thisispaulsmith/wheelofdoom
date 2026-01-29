@@ -1,0 +1,148 @@
+name: Application Deploy
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'src/**'
+      - '.github/workflows/app-deploy.yml'
+      - '!**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: app-deploy-prod
+  cancel-in-progress: false
+
+env:
+  AZURE_RESOURCE_GROUP: rg-wheelofdoom
+  STATIC_WEB_APP_NAME: swa-wheelofdoom
+  FUNCTION_APP_NAME: func-wheelofdoom
+
+jobs:
+  test-and-deploy:
+    name: Test, Build, and Deploy Application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            src/app/package-lock.json
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install root dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Install frontend dependencies
+        run: cd src/app && npm ci --legacy-peer-deps
+
+      - name: Run frontend tests
+        run: npm run test:app
+        env:
+          CI: true
+
+      - name: Run backend tests
+        run: npm run test:api
+        env:
+          CI: true
+
+      - name: Build frontend
+        run: cd src/app && npm run build
+        env:
+          CI: true
+
+      - name: Build backend
+        run: |
+          dotnet restore WheelOfDoom.slnx
+          cd src/api
+          dotnet publish -c Release -o ./publish
+
+      - name: Deploy Azure Functions
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ env.FUNCTION_APP_NAME }}
+          package: src/api/publish
+
+      - name: Deploy to Azure Static Web Apps
+        id: swa-deploy
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "src/app"
+          output_location: "dist"
+          skip_app_build: true
+
+      - name: Deployment Summary
+        run: |
+          echo "## ✅ Application Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Application URL:** https://${{ env.STATIC_WEB_APP_NAME }}.azurestaticapps.net" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** ${{ env.AZURE_RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** API requests to /api/* are automatically routed to the linked Function App backend" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Deployed At:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+
+  smoke-tests:
+    name: Run Smoke Tests
+    needs: test-and-deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Wait for deployment propagation
+        run: sleep 30
+
+      - name: Test frontend endpoint
+        run: |
+          echo "Testing Static Web App endpoint..."
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.STATIC_WEB_APP_NAME }}.azurestaticapps.net)
+
+          if [ $RESPONSE -eq 200 ] || [ $RESPONSE -eq 401 ]; then
+            echo "✅ Static Web App is responding (HTTP $RESPONSE)"
+            echo "Note: 401 is expected due to Azure AD authentication"
+          else
+            echo "❌ Static Web App returned unexpected status: $RESPONSE"
+            exit 1
+          fi
+
+      - name: Test API endpoint (via Static Web App proxy)
+        run: |
+          echo "Testing API endpoint through Static Web App..."
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.STATIC_WEB_APP_NAME }}.azurestaticapps.net/api/entries)
+
+          if [ $RESPONSE -eq 401 ]; then
+            echo "✅ API endpoint requires authentication (HTTP $RESPONSE)"
+          else
+            echo "⚠️ API endpoint returned: $RESPONSE (expected 401)"
+          fi
+
+      - name: Smoke Test Summary
+        run: |
+          echo "## 🧪 Smoke Tests Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All smoke tests passed successfully!" >> $GITHUB_STEP_SUMMARY

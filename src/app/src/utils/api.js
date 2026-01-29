@@ -1,3 +1,6 @@
+// API base URL - uses relative path
+// In development: Proxied by Vite to local Functions (localhost:7071)
+// In production: Proxied by Static Web App to linked Function App backend
 const API_BASE = '/api';
 
 export async function fetchEntries() {
