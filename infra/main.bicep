@@ -90,6 +90,9 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   name: functionAppName
   location: location
   kind: 'functionapp,linux'
+  identity: {
+    type: 'SystemAssigned'
+  }
   properties: {
     serverFarmId: appServicePlan.id
     reserved: true
@@ -103,36 +106,9 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         ]
         supportCredentials: false
       }
-      appSettings: [
-        {
-          name: 'AzureWebJobsStorage'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
-        }
-        {
-          name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
-        }
-        {
-          name: 'WEBSITE_CONTENTSHARE'
-          value: toLower(functionAppName)
-        }
-        {
-          name: 'FUNCTIONS_EXTENSION_VERSION'
-          value: '~4'
-        }
-        {
-          name: 'FUNCTIONS_WORKER_RUNTIME'
-          value: 'dotnet-isolated'
-        }
-        {
-          name: 'ConnectionStrings__tables'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
-        }
-        {
-          name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
-          value: ''  // Optional: Add Application Insights later
-        }
-      ]
+      // Initial app settings without Key Vault references
+      // Will be updated with Key Vault references after role assignment is created
+      appSettings: []
     }
     httpsOnly: true
   }
@@ -252,6 +228,38 @@ resource githubActionsKeyVaultRole 'Microsoft.Authorization/roleAssignments@2022
     principalId: githubActionsPrincipalId
     principalType: 'ServicePrincipal'
   }
+}
+
+// Grant Function App managed identity Key Vault Secrets User role
+// This allows the Function App to read secrets at runtime
+resource functionAppKeyVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(keyVault.id, functionApp.id, 'KeyVaultSecretsUser')
+  scope: keyVault
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')  // Key Vault Secrets User
+    principalId: functionApp.identity.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
+// Configure Function App settings with Key Vault references
+// This is a separate resource to ensure role assignment exists before Key Vault references are resolved
+resource functionAppSettings 'Microsoft.Web/sites/config@2023-12-01' = {
+  parent: functionApp
+  name: 'appsettings'
+  properties: {
+    AzureWebJobsStorage: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=storage-connection-string)'
+    WEBSITE_CONTENTAZUREFILECONNECTIONSTRING: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=storage-connection-string)'
+    WEBSITE_CONTENTSHARE: toLower(functionAppName)
+    FUNCTIONS_EXTENSION_VERSION: '~4'
+    FUNCTIONS_WORKER_RUNTIME: 'dotnet-isolated'
+    ConnectionStrings__tables: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=storage-connection-string)'
+    APPLICATIONINSIGHTS_CONNECTION_STRING: ''  // Optional: Add Application Insights later
+  }
+  dependsOn: [
+    functionAppKeyVaultRole
+    storageConnectionStringSecret
+  ]
 }
 
 // Configure Static Web App settings with Key Vault references
