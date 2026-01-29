@@ -30,6 +30,44 @@ param githubActionsPrincipalId string
 @description('Name of the Function App')
 param functionAppName string
 
+// Storage Account for Table Storage
+resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
+  name: storageAccountName
+  location: location
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    allowBlobPublicAccess: false
+    supportsHttpsTrafficOnly: true
+    accessTier: 'Hot'
+  }
+  tags: {
+    environment: environmentName
+    application: 'WheelOfDoom'
+  }
+}
+
+// Table Service
+resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-01' = {
+  parent: storageAccount
+  name: 'default'
+}
+
+// Entries Table
+resource entriesTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  parent: tableService
+  name: 'Entries'
+}
+
+// Results Table
+resource resultsTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
+  parent: tableService
+  name: 'Results'
+}
+
 // App Service Plan for Azure Functions (Consumption tier)
 resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: '${functionAppName}-plan'
@@ -138,44 +176,6 @@ resource linkedBackend 'Microsoft.Web/staticSites/linkedBackends@2023-12-01' = {
     backendResourceId: functionApp.id
     region: location
   }
-}
-
-// Storage Account for Table Storage
-resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
-  name: storageAccountName
-  location: location
-  sku: {
-    name: 'Standard_LRS'
-  }
-  kind: 'StorageV2'
-  properties: {
-    minimumTlsVersion: 'TLS1_2'
-    allowBlobPublicAccess: false
-    supportsHttpsTrafficOnly: true
-    accessTier: 'Hot'
-  }
-  tags: {
-    environment: environmentName
-    application: 'WheelOfDoom'
-  }
-}
-
-// Table Service
-resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-01' = {
-  parent: storageAccount
-  name: 'default'
-}
-
-// Entries Table
-resource entriesTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
-  parent: tableService
-  name: 'Entries'
-}
-
-// Results Table
-resource resultsTable 'Microsoft.Storage/storageAccounts/tableServices/tables@2023-05-01' = {
-  parent: tableService
-  name: 'Results'
 }
 
 // Azure Key Vault for secure secret storage
