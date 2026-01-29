@@ -68,11 +68,11 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       appSettings: [
         {
           name: 'AzureWebJobsStorage'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=storage-connection-string)'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
         }
         {
           name: 'WEBSITE_CONTENTAZUREFILECONNECTIONSTRING'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=storage-connection-string)'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
         }
         {
           name: 'WEBSITE_CONTENTSHARE'
@@ -88,7 +88,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         }
         {
           name: 'ConnectionStrings__tables'
-          value: '@Microsoft.KeyVault(VaultName=${keyVaultName};SecretName=storage-connection-string)'
+          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=${environment().suffixes.storage}'
         }
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
@@ -102,9 +102,6 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
     environment: environmentName
     application: 'WheelOfDoom'
   }
-  dependsOn: [
-    storageConnectionStringSecret
-  ]
 }
 
 // Azure Static Web App (Frontend only)
@@ -272,7 +269,7 @@ resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
     aadClientIdSecret
     aadClientSecretSecret
     githubActionsKeyVaultRole
-    functionApp
+    linkedBackend
   ]
 }
 
