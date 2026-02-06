@@ -60,7 +60,7 @@ function App() {
             onSpinStart={handleSpinStart}
             onSpinComplete={handleSpinComplete}
             onTick={handleTick}
-            disabled={entriesLoading || entries.length === 0}
+            disabled={entriesLoading || entries.length < 2}
           />
         </div>
 
