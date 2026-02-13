@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
@@ -8,6 +9,7 @@ namespace WheelOfDoom.Api.Functions;
 
 public class ResultsFunction
 {
+    private static readonly ActivitySource ActivitySource = new("WheelOfDoom.Api");
     private readonly ILogger<ResultsFunction> _logger;
     private readonly ITableStorageService _tableStorage;
 
@@ -38,7 +40,12 @@ public class ResultsFunction
     public async Task<IActionResult> AddResult(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "results")] HttpRequest req)
     {
+        using var activity = ActivitySource.StartActivity("WheelSpun");  // Business event name
+
         var user = GetUserIdentity(req);
+
+        activity?.SetTag("user.name", user);
+
         _logger.LogInformation("Recording spin result by {User}", user);
 
         AddResultRequest? body;
@@ -56,7 +63,12 @@ public class ResultsFunction
             return new BadRequestObjectResult(new { error = "Name is required" });
         }
 
+        activity?.SetTag("winner.name", body.Name.Trim());
+
         var result = await _tableStorage.AddResultAsync(body.Name.Trim(), user);
+
+        activity?.SetTag("wheel.spun", true);
+        _logger.LogInformation("Wheel spun - Winner: {Winner} by {User}", result.SelectedName, user);
 
         return new CreatedResult("/api/results", new
         {

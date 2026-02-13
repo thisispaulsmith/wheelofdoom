@@ -53,6 +53,18 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Get Application Insights Connection String
+        id: get-appinsights
+        run: |
+          CONNECTION_STRING=$(az monitor app-insights component show \
+            --app ${{ env.STATIC_WEB_APP_NAME }}-ai \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --query connectionString \
+            --output tsv)
+
+          echo "::add-mask::$CONNECTION_STRING"
+          echo "APPINSIGHTS_CONNECTION_STRING=$CONNECTION_STRING" >> $GITHUB_ENV
+
       - name: Install root dependencies
         run: npm ci --legacy-peer-deps
 
@@ -73,6 +85,7 @@ jobs:
         run: cd src/app && npm run build
         env:
           CI: true
+          VITE_APPINSIGHTS_CONNECTION_STRING: ${{ env.APPINSIGHTS_CONNECTION_STRING }}
 
       - name: Build backend
         run: |
@@ -114,6 +127,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
       - name: Wait for deployment propagation
         run: sleep 30
 
@@ -139,6 +159,23 @@ jobs:
             echo "✅ API endpoint requires authentication (HTTP $RESPONSE)"
           else
             echo "⚠️ API endpoint returned: $RESPONSE (expected 401)"
+          fi
+
+      - name: Verify Application Insights
+        run: |
+          echo "Waiting for telemetry ingestion (2min delay)..."
+          sleep 120
+
+          QUERY_RESULT=$(az monitor app-insights query \
+            --app ${{ env.STATIC_WEB_APP_NAME }}-ai \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --analytics-query "requests | where timestamp > ago(5m) | count" \
+            --output json || echo "[]")
+
+          if [ "$QUERY_RESULT" != "[]" ]; then
+            echo "✅ Telemetry detected"
+          else
+            echo "⚠️ No telemetry yet (may take a few minutes)"
           fi
 
       - name: Smoke Test Summary

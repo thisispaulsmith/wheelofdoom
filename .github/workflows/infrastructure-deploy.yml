@@ -53,6 +53,7 @@ jobs:
     outputs:
       static-web-app-name: ${{ steps.deploy-infra.outputs.staticWebAppName }}
       storage-account-name: ${{ steps.deploy-infra.outputs.storageAccountName }}
+      app-insights-connection-string: ${{ steps.deploy-infra.outputs.appInsightsConnectionString }}
 
     steps:
       - name: Checkout repository
@@ -115,4 +116,13 @@ jobs:
           az storage table list \
             --account-name ${{ needs.deploy-infrastructure.outputs.storage-account-name }} \
             --query "[].{name:name}" \
+            --output table
+
+      - name: Verify Application Insights
+        run: |
+          echo "Verifying Application Insights..."
+          az monitor app-insights component show \
+            --app ${{ needs.deploy-infrastructure.outputs.static-web-app-name }}-ai \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --query "{name:name,location:location,kind:kind}" \
             --output table

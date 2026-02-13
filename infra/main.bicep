@@ -26,6 +26,44 @@ param functionAppName string
 
 var deploymentStorageContainerName = 'app-package'
 
+// Log Analytics Workspace for Application Insights
+resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
+  name: '${staticWebAppName}-logs'
+  location: location
+  properties: {
+    sku: {
+      name: 'PerGB2018'
+    }
+    retentionInDays: 30
+    features: {
+      enableLogAccessUsingOnlyResourcePermissions: true
+    }
+  }
+  tags: {
+    environment: environmentName
+    application: 'WheelOfDoom'
+  }
+}
+
+// Application Insights
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: '${staticWebAppName}-ai'
+  location: location
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logAnalyticsWorkspace.id
+    RetentionInDays: 30
+    IngestionMode: 'LogAnalytics'
+    publicNetworkAccessForIngestion: 'Enabled'
+    publicNetworkAccessForQuery: 'Enabled'
+  }
+  tags: {
+    environment: environmentName
+    application: 'WheelOfDoom'
+  }
+}
+
 // Storage Account for Table Storage
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
@@ -141,6 +179,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       AzureWebJobsStorage:'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
       DEPLOYMENT_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
       ConnectionStrings__tables: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
+      APPLICATIONINSIGHTS_CONNECTION_STRING: appInsights.properties.ConnectionString
     }
   }
 }
@@ -190,6 +229,7 @@ resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
     AAD_CLIENT_ID: aadClientId
     AAD_CLIENT_SECRET: aadClientSecret
     FUNCTION_APP_URL: 'https://${functionApp.properties.defaultHostName}'
+    APPLICATIONINSIGHTS_CONNECTION_STRING: appInsights.properties.ConnectionString
   }
   dependsOn: [
     linkedBackend
@@ -206,3 +246,6 @@ output functionAppId string = functionApp.id
 output storageAccountName string = storageAccount.name
 output storageAccountId string = storageAccount.id
 output tableEndpoint string = storageAccount.properties.primaryEndpoints.table
+output appInsightsName string = appInsights.name
+output appInsightsConnectionString string = appInsights.properties.ConnectionString
+output logAnalyticsWorkspaceId string = logAnalyticsWorkspace.id
