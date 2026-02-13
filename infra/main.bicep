@@ -13,9 +13,6 @@ param tenantId string
 @description('Environment name (dev, staging, prod)')
 param environmentName string = 'prod'
 
-@description('Key Vault name (must be globally unique, 3-24 chars)')
-param keyVaultName string
-
 @secure()
 @description('Azure AD client ID for user authentication')
 param aadClientId string
@@ -30,6 +27,8 @@ param githubActionsPrincipalId string
 @description('Name of the Function App')
 param functionAppName string
 
+var deploymentStorageContainerName = 'app-package'
+
 // Storage Account for Table Storage
 resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
@@ -39,16 +38,30 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   }
   kind: 'StorageV2'
   properties: {
-    minimumTlsVersion: 'TLS1_2'
-    allowBlobPublicAccess: false
-    supportsHttpsTrafficOnly: true
     accessTier: 'Hot'
+    allowBlobPublicAccess: false
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
   }
   tags: {
     environment: environmentName
     application: 'WheelOfDoom'
   }
+  resource blobServices 'blobServices' = {
+    name: 'default'
+    properties: {
+      deleteRetentionPolicy: {}
+    }
+    resource deploymentContainer 'containers' = {
+      name: deploymentStorageContainerName
+      properties: {
+        publicAccess: 'None'
+      }
+    }
+  }
 }
+
+var storageKey = storageAccount.listKeys().keys[0].value
 
 // Table Service
 resource tableService 'Microsoft.Storage/storageAccounts/tableServices@2023-05-01' = {
@@ -73,8 +86,8 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-12-01' = {
   name: '${functionAppName}-plan'
   location: location
   sku: {
-    name: 'Y1'
-    tier: 'Dynamic'
+    name: 'FC1'
+    tier: 'FlexConsumption'
   }
   properties: {
     reserved: true  // Required for Linux
@@ -90,31 +103,48 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   name: functionAppName
   location: location
   kind: 'functionapp,linux'
-  identity: {
-    type: 'SystemAssigned'
-  }
-  properties: {
-    serverFarmId: appServicePlan.id
-    reserved: true
-    siteConfig: {
-      linuxFxVersion: 'DOTNET-ISOLATED|9.0'
-      ftpsState: 'Disabled'
-      minTlsVersion: '1.2'
-      cors: {
-        allowedOrigins: [
-          'https://${staticWebAppName}.azurestaticapps.net'
-        ]
-        supportCredentials: false
-      }
-      // Initial app settings without Key Vault references
-      // Will be updated with Key Vault references after role assignment is created
-      appSettings: []
-    }
-    httpsOnly: true
-  }
   tags: {
     environment: environmentName
     application: 'WheelOfDoom'
+  }
+  properties: {
+    serverFarmId: appServicePlan.id
+    httpsOnly: true
+    siteConfig: {
+      ftpsState: 'Disabled'
+      minTlsVersion: '1.2'
+    }
+    
+    functionAppConfig: {
+      runtime: {
+        name: 'dotnet-isolated'
+        version: '10.0'
+      }
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          // You need a container URL here, not just the account.
+          // Example shape: "https://<account>.blob.core.windows.net/<container>"
+          value: '${storageAccount.properties.primaryEndpoints.blob}${deploymentStorageContainerName}'
+          authentication: {
+            type: 'StorageAccountConnectionString'
+            storageAccountConnectionStringName: 'DEPLOYMENT_STORAGE_CONNECTION_STRING'
+          }
+        }
+      }
+      scaleAndConcurrency: {
+        maximumInstanceCount: 100
+        instanceMemoryMB: 512
+      }
+    }
+  }
+  resource configAppSettings 'config' = {
+    name: 'appsettings'
+    properties: {
+      AzureWebJobsStorage:'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
+      DEPLOYMENT_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
+      ConnectionStrings__tables: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
+    }
   }
 }
 
@@ -132,7 +162,6 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
     buildProperties: {
       appLocation: 'src/app'
       outputLocation: 'dist'
-      // apiLocation removed - using linked backend Function App
     }
     stagingEnvironmentPolicy: 'Enabled'
     allowConfigFileUpdates: true
@@ -154,143 +183,49 @@ resource linkedBackend 'Microsoft.Web/staticSites/linkedBackends@2023-12-01' = {
   }
 }
 
-// Azure Key Vault for secure secret storage
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
-  name: keyVaultName
-  location: location
-  properties: {
-    sku: {
-      family: 'A'
-      name: 'standard'
-    }
-    tenantId: tenantId
-    enableRbacAuthorization: true  // Use RBAC instead of access policies
-    enabledForDeployment: false
-    enabledForDiskEncryption: false
-    enabledForTemplateDeployment: false
-    enableSoftDelete: true
-    softDeleteRetentionInDays: 7
-    publicNetworkAccess: 'Enabled'
-  }
-  tags: {
-    environment: environmentName
-    application: 'WheelOfDoom'
-  }
-}
 
-var storageKey = storageAccount.listKeys().keys[0].value
 
-// Store storage account connection string as Key Vault secret
-// Note: Using listKeys() here is SAFE - the value is stored encrypted in Key Vault,
-// not exposed in deployment outputs/history (unlike output variables)
-resource storageConnectionStringSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: keyVault
-  name: 'storage-connection-string'
-  properties: {
-    value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
-  }
-  dependsOn: [
-    githubActionsKeyVaultRole
-  ]
-}
+//// Grant GitHub Actions service principal Key Vault Secrets Officer role
+//// This allows the deployment pipeline to read/write secrets during deployment
+//resource githubActionsKeyVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+//  name: guid(keyVault.id, githubActionsPrincipalId, 'KeyVaultSecretsOfficer')
+//  scope: keyVault
+//  properties: {
+//    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')
+//    principalId: githubActionsPrincipalId
+//    principalType: 'ServicePrincipal'
+//  }
+//}
+//
+//// Configure Static Web App settings with Key Vault references
+//// Note: Static Web Apps can read Key Vault secrets via special Azure platform handling
+//// The @Microsoft.KeyVault syntax is resolved by Azure at runtime
+//resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
+//  parent: staticWebApp
+//  name: 'appsettings'
+//  properties: {
+//    AAD_CLIENT_ID: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=aad-client-id)'
+//    AAD_CLIENT_SECRET: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=aad-client-secret)'
+//    FUNCTION_APP_URL: 'https://${functionApp.properties.defaultHostName}'
+//  }
+//  dependsOn: [
+//    aadClientIdSecret
+//    aadClientSecretSecret
+//    githubActionsKeyVaultRole
+//    linkedBackend
+//  ]
+//}
 
-// Store AAD client ID as Key Vault secret
-resource aadClientIdSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: keyVault
-  name: 'aad-client-id'
-  properties: {
-    value: aadClientId
-  }
-  dependsOn: [
-    githubActionsKeyVaultRole
-  ]
-}
-
-// Store AAD client secret as Key Vault secret
-resource aadClientSecretSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
-  parent: keyVault
-  name: 'aad-client-secret'
-  properties: {
-    value: aadClientSecret
-  }
-  dependsOn: [
-    githubActionsKeyVaultRole
-  ]
-}
-
-// Grant GitHub Actions service principal Key Vault Secrets Officer role
-// This allows the deployment pipeline to read/write secrets during deployment
-resource githubActionsKeyVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.id, githubActionsPrincipalId, 'KeyVaultSecretsOfficer')
-  scope: keyVault
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')
-    principalId: githubActionsPrincipalId
-    principalType: 'ServicePrincipal'
-  }
-}
-
-// Grant Function App managed identity Key Vault Secrets User role
-// This allows the Function App to read secrets at runtime
-resource functionAppKeyVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(keyVault.id, functionApp.id, 'KeyVaultSecretsUser')
-  scope: keyVault
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')  // Key Vault Secrets User
-    principalId: functionApp.identity.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
-
-// Configure Function App settings with Key Vault references
-// This is a separate resource to ensure role assignment exists before Key Vault references are resolved
-resource functionAppSettings 'Microsoft.Web/sites/config@2023-12-01' = {
-  parent: functionApp
-  name: 'appsettings'
-  properties: {
-    AzureWebJobsStorage: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=storage-connection-string)'
-    WEBSITE_CONTENTAZUREFILECONNECTIONSTRING: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=storage-connection-string)'
-    WEBSITE_CONTENTSHARE: toLower(functionAppName)
-    FUNCTIONS_EXTENSION_VERSION: '~4'
-    FUNCTIONS_WORKER_RUNTIME: 'dotnet-isolated'
-    ConnectionStrings__tables: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=storage-connection-string)'
-    APPLICATIONINSIGHTS_CONNECTION_STRING: ''  // Optional: Add Application Insights later
-  }
-  dependsOn: [
-    functionAppKeyVaultRole
-    storageConnectionStringSecret
-  ]
-}
-
-// Configure Static Web App settings with Key Vault references
-// Note: Static Web Apps can read Key Vault secrets via special Azure platform handling
-// The @Microsoft.KeyVault syntax is resolved by Azure at runtime
-resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
-  parent: staticWebApp
-  name: 'appsettings'
-  properties: {
-    AAD_CLIENT_ID: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=aad-client-id)'
-    AAD_CLIENT_SECRET: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=aad-client-secret)'
-    FUNCTION_APP_URL: 'https://${functionApp.properties.defaultHostName}'
-  }
-  dependsOn: [
-    aadClientIdSecret
-    aadClientSecretSecret
-    githubActionsKeyVaultRole
-    linkedBackend
-  ]
-}
-
-// Outputs
-output staticWebAppDefaultHostName string = staticWebApp.properties.defaultHostname
-output staticWebAppId string = staticWebApp.id
-output staticWebAppName string = staticWebApp.name
-output functionAppName string = functionApp.name
-output functionAppDefaultHostName string = functionApp.properties.defaultHostName
-output functionAppId string = functionApp.id
-output storageAccountName string = storageAccount.name
-output storageAccountId string = storageAccount.id
-output tableEndpoint string = storageAccount.properties.primaryEndpoints.table
-output keyVaultName string = keyVault.name
-output keyVaultUri string = keyVault.properties.vaultUri
-output keyVaultId string = keyVault.id
+//// Outputs
+//output staticWebAppDefaultHostName string = staticWebApp.properties.defaultHostname
+//output staticWebAppId string = staticWebApp.id
+//output staticWebAppName string = staticWebApp.name
+//output functionAppName string = functionApp.name
+//output functionAppDefaultHostName string = functionApp.properties.defaultHostName
+//output functionAppId string = functionApp.id
+//output storageAccountName string = storageAccount.name
+//output storageAccountId string = storageAccount.id
+//output tableEndpoint string = storageAccount.properties.primaryEndpoints.table
+//output keyVaultName string = keyVault.name
+//output keyVaultUri string = keyVault.properties.vaultUri
+//output keyVaultId string = keyVault.id
