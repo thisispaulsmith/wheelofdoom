@@ -8,9 +8,12 @@
     "test:app:watch": "vitest --config vitest.config.js",
     "test:api": "dotnet test test/api",
     "test:e2e": "playwright test --config test/e2e/playwright.config.js",
-    "test": "npm run test:app && npm run test:api"
+    "test": "npm run test:app && npm run test:api",
+    "dev:with-auth": "swa start --config swa-cli.config.json",
+    "dev:with-auth:login": "swa login"
   },
   "devDependencies": {
+    "@azure/static-web-apps-cli": "^2.0.1",
     "vitest": "^4.0.17",
     "@vitejs/plugin-react": "^5.1.1",
     "jsdom": "^27.4.0",

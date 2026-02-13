@@ -54,6 +54,32 @@ cd src/app && npm run build         # Outputs to src/app/dist
 cd src/api && dotnet publish -c Release
 ```
 
+### Running with Authentication Simulation (Optional)
+
+For testing authentication-dependent features locally:
+
+**Prerequisites**:
+1. Start Aspire services first:
+   ```bash
+   cd src/AppHost
+   dotnet run
+   ```
+   This starts the API (port 7071) and storage (Azurite).
+
+2. In a separate terminal, start SWA CLI:
+   ```bash
+   npm run dev:with-auth
+   ```
+
+3. Access app at http://localhost:4280 (SWA CLI port)
+
+**Simulated User**:
+- Username: `test@example.com`
+- Role: `authenticated`
+- Configure in `.swa/auth/local.auth.json`
+
+**Note**: For daily development without auth concerns, continue using `dotnet run` in AppHost.
+
 ## Architecture Insights
 
 ### Aspire Configuration (`src/AppHost/AppHost.cs`)
@@ -112,14 +138,33 @@ User Action → React Hook → API Utility (fetch) → Vite Proxy
 - This ensures newest results sort first without explicit ORDER BY
 - See `src/api/Models/SpinResult.cs` for implementation
 
-### Authentication Flow
+### Authentication Architecture
 
-**Production**: Azure Static Web App enforces Azure AD authentication
-- User identity in `X-MS-CLIENT-PRINCIPAL-NAME` header
+**Production**:
+- Azure Static Web Apps enforces auth via `staticwebapp.config.json`
+- Routes require `authenticated` role
+- Unauthenticated requests redirect to `/.auth/login/aad`
+- Azure AD validates against configured redirect URIs:
+  - `https://swa-wheelofdoom.azurestaticapps.net/.auth/login/aad/callback`
+  - `https://wheelofdoom.cognassist.dev/.auth/login/aad/callback`
+- Authenticated user identity passed via `X-MS-CLIENT-PRINCIPAL-NAME` header
 - Functions extract user via `req.Headers["x-ms-client-principal-name"]`
-- Unauthenticated requests redirected to `/.auth/login/aad`
 
-**Local Development**: Falls back to "anonymous" when header is missing
+**Local Development (Default)**:
+- Aspire orchestration (`dotnet run`)
+- No authentication enforcement
+- Functions fallback to `"anonymous"` user
+
+**Local Development (With Auth Simulation)**:
+- SWA CLI (`npm run dev:with-auth`)
+- Simulates `X-MS-CLIENT-PRINCIPAL-NAME` header
+- User identity: `test@example.com` (configurable)
+- Requires Aspire services running (API + Storage)
+
+**Custom Domain Requirements**:
+- Custom domain must be configured in Azure Static Web App
+- Redirect URI must be added to Azure AD app registration
+- Format: `https://<your-domain>/.auth/login/aad/callback`
 
 ### Sound Synthesis (`src/app/src/hooks/useSound.js`)
 
@@ -354,11 +399,15 @@ Uses `Azure/static-web-apps-deploy@v1` action with:
 # Save as AAD_CLIENT_SECRET in GitHub secrets
 ```
 
-**3. Configure Redirect URI** (after Static Web App is deployed):
+**3. Configure Redirect URIs** (after Static Web App is deployed):
 ```
 Type: Web
-URI: https://wheelofdoom-swa.azurestaticapps.net/.auth/login/aad/callback
+URIs:
+  - https://swa-wheelofdoom.azurestaticapps.net/.auth/login/aad/callback (default domain)
+  - https://wheelofdoom.cognassist.dev/.auth/login/aad/callback (custom domain)
 ```
+
+**Note**: Both redirect URIs are required for authentication to work on both the default Azure domain and custom domain.
 
 **4. Update Tenant ID**:
 Edit `staticwebapp.config.json` line 6 or `infra/main.bicepparam`:
@@ -507,6 +556,35 @@ No manual CORS configuration needed locally - Vite's proxy handles all `/api/*` 
 - Vite outputs to `src/app/dist` (not root `dist`)
 - Azure Static Web Apps expects "Output location" = `dist` (relative to App location)
 - Ensure `.gitignore` excludes `dist/` to prevent committing build artifacts
+
+### Static Web App Configuration Deployment
+
+**Critical**: The `staticwebapp.config.json` file must be in the deployment directory.
+
+**Current Setup**:
+- Vite build automatically copies `staticwebapp.config.json` from repository root to `src/app/dist/` during build
+- Configured in `src/app/vite.config.js` via custom plugin
+- Runs on every build (local and CI/CD)
+
+**Why This Matters**:
+Azure Static Web Apps reads configuration from the `app_location` directory. Since we deploy from `src/app/dist` (Vite build output), the config must be in that directory. Without it, authentication is not enforced.
+
+**Verification**:
+```bash
+# After build, verify config was copied
+ls -la src/app/dist/staticwebapp.config.json
+
+# Check build logs for confirmation
+# Should see: "✓ Copied staticwebapp.config.json to dist/"
+
+# Verify deployed config is accessible
+curl https://swa-wheelofdoom.azurestaticapps.net/staticwebapp.config.json
+```
+
+**Troubleshooting**:
+- If authentication stops working, verify config exists in dist/
+- Check that Vite build completes successfully
+- Ensure staticwebapp.config.json at root has valid JSON syntax
 
 ## Debugging Common Issues
 

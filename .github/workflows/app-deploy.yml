@@ -86,6 +86,7 @@ jobs:
         env:
           CI: true
           VITE_APPINSIGHTS_CONNECTION_STRING: ${{ env.APPINSIGHTS_CONNECTION_STRING }}
+        # Note: Vite config automatically copies staticwebapp.config.json to dist/
 
       - name: Build backend
         run: |
@@ -159,6 +160,19 @@ jobs:
             echo "✅ API endpoint requires authentication (HTTP $RESPONSE)"
           else
             echo "⚠️ API endpoint returned: $RESPONSE (expected 401)"
+          fi
+
+      - name: Test custom domain authentication
+        run: |
+          echo "Testing custom domain authentication..."
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://wheelofdoom.cognassist.dev)
+
+          if [ $RESPONSE -eq 401 ] || [ $RESPONSE -eq 302 ]; then
+            echo "✅ Custom domain requires authentication (HTTP $RESPONSE)"
+          else
+            echo "❌ Custom domain returned unexpected status: $RESPONSE"
+            echo "⚠️ Check Azure AD redirect URI configuration"
+            exit 1
           fi
 
       - name: Verify Application Insights
