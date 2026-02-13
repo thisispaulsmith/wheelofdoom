@@ -20,8 +20,8 @@ describe('EntryList', () => {
   });
 
   it('shows loading state', () => {
-    render(<EntryList entries={[]} loading={true} onAdd={vi.fn()} onDelete={vi.fn()} />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    const { container } = render(<EntryList entries={[]} loading={true} onAdd={vi.fn()} onDelete={vi.fn()} />);
+    expect(container.querySelector('.skeleton-loader-entry')).toBeInTheDocument();
   });
 
   it('shows empty state when no entries', () => {

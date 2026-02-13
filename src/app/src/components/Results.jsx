@@ -1,3 +1,4 @@
+import { SkeletonLoader } from './SkeletonLoader';
 import './Results.css';
 
 function formatTime(dateString) {
@@ -22,11 +23,15 @@ export function Results({ results, loading }) {
       <h2 className="results-header">Recent Results</h2>
 
       {loading ? (
-        <div className="results-loading">Loading...</div>
+        <div className="results-loading-wrapper">
+          <SkeletonLoader type="result" count={4} />
+        </div>
       ) : results.length === 0 ? (
-        <div className="results-empty">No spins yet. Give it a whirl!</div>
+        <div className="results-empty-wrapper">
+          <div className="results-empty">No spins yet. Give it a whirl!</div>
+        </div>
       ) : (
-        <ul className="results-list">
+        <ul className="results-list fade-in">
           {results.slice(0, 10).map((result, index) => (
             <li key={index} className="result-item">
               <span className="result-name">{result.selectedName}</span>

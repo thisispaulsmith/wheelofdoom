@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SkeletonLoader } from './SkeletonLoader';
 import './EntryList.css';
 
 export function EntryList({ entries, onAdd, onDelete, loading }) {
@@ -35,9 +36,11 @@ export function EntryList({ entries, onAdd, onDelete, loading }) {
       </h2>
 
       {loading ? (
-        <div className="entry-list-loading">Loading...</div>
+        <div className="entry-list-loading-wrapper">
+          <SkeletonLoader type="entry" count={5} />
+        </div>
       ) : (
-        <ul className="entry-list-items">
+        <ul className="entry-list-items fade-in">
           {entries.map((entry) => (
             <li key={entry.name} className="entry-item">
               <span className="entry-name">{entry.name}</span>

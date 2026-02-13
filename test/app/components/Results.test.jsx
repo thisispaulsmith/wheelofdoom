@@ -31,8 +31,8 @@ describe('Results', () => {
   });
 
   it('shows loading state', () => {
-    render(<Results results={[]} loading={true} />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    const { container } = render(<Results results={[]} loading={true} />);
+    expect(container.querySelector('.skeleton-loader-result')).toBeInTheDocument();
   });
 
   it('shows empty state when no results', () => {
