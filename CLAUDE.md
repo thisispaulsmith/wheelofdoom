@@ -223,10 +223,10 @@ infra/
 ```
 
 **Resources Created**:
-1. Azure Static Web App (Standard tier) - `wheelofdoom-swa`
-2. Storage Account (Standard LRS) - `wheelodomstorage`
-3. Table Service with Entries and Results tables
-4. Azure Key Vault (Standard tier) - `wheelofdoom-kv` (secure secret storage)
+1. Azure Static Web App (Standard tier) - `swa-wheelofdoom`
+2. Azure Function App (Flex Consumption) - `func-wheelofdoom`
+3. Storage Account (Standard LRS) - `stowheelofdoom`
+4. Table Service with Entries and Results tables
 
 **Deploy Infrastructure**:
 ```bash
@@ -278,26 +278,22 @@ az deployment group create \
 1. **Secure Parameters** - AAD credentials passed via `@secure()` decorated parameters:
    - `aadClientId` and `aadClientSecret` passed from GitHub secrets to Bicep
    - `@secure()` decorator masks values in deployment history
-   - Parameters stored as Key Vault secrets: `aad-client-id` and `aad-client-secret`
+   - Stored directly in Static Web App app settings
 
-2. **Storage Connection String** - Created via Key Vault secret resource:
-   - Uses `listKeys()` to retrieve storage account key (safe in secret resource, not in outputs)
-   - Value stored encrypted in Key Vault as `storage-connection-string`
+2. **Storage Connection String** - Built directly in Bicep:
+   - Uses `listKeys()` to retrieve storage account key
+   - Connection string constructed and configured in Function App app settings
    - Never appears in deployment outputs or history
 
-3. **RBAC Permissions** - Configured declaratively in Bicep:
-   - GitHub Actions service principal granted Key Vault Secrets Officer role
-   - Uses `Microsoft.Authorization/roleAssignments` resource
-   - No workflow CLI commands needed
-
-4. **App Settings** - Configured via `staticSites/config` resource in Bicep:
-   - All settings use Key Vault reference syntax: `@Microsoft.KeyVault(VaultName=...;SecretName=...)`
+3. **App Settings** - Configured via `staticSites/config` and `sites/config` resources in Bicep:
+   - Static Web App: `AAD_CLIENT_ID`, `AAD_CLIENT_SECRET`, `FUNCTION_APP_URL`
+   - Function App: `AzureWebJobsStorage`, `DEPLOYMENT_STORAGE_CONNECTION_STRING`, `ConnectionStrings__tables`
    - Settings deployed atomically with infrastructure
    - No manual configuration steps required
 
 **Security Pattern**:
 - ✅ `listKeys()` in **outputs** = BAD (plaintext exposure)
-- ✅ `listKeys()` in **secret resource** = GOOD (encrypted in Key Vault)
+- ✅ `listKeys()` in **app settings** = GOOD (encrypted by Azure platform)
 - ✅ All secrets managed in Bicep (single source of truth)
 - ✅ No workflow CLI commands for configuration
 
@@ -311,10 +307,13 @@ builder.AddAzureTableServiceClient("tables");  // Works in both environments!
 - ✅ **No workflow steps** - Single deployment handles everything
 - ✅ **Atomic deployment** - Settings deployed with infrastructure
 - ✅ **Secure parameters** - `@secure()` masks values in history
-- ✅ **No secrets in outputs** - All secrets in Key Vault only
-- ✅ **RBAC as code** - Permission grants defined in Bicep
-- ✅ **Audit logs** - All secret access logged
-- ✅ **Encryption** - At rest and in transit
+- ✅ **No secrets in outputs** - Secrets never exposed in deployment history
+- ✅ **Platform encryption** - Azure encrypts app settings at rest and in transit
+
+**Security Trade-offs**:
+- Secrets stored in app settings (Azure platform security) rather than Key Vault
+- No Key Vault audit logging for secret access
+- Secret rotation requires updating app settings directly
 
 ### Deployment Workflow Steps
 
@@ -400,9 +399,8 @@ curl https://wheelofdoom-swa.azurestaticapps.net/api/entries \
 
 **Monthly Budget**: $10-15
 - Azure Static Web Apps Standard: $9/month
-- Azure Functions: $0-1/month (consumption tier)
+- Azure Functions (Flex Consumption): $0-1/month (within free tier)
 - Azure Storage: $1-5/month
-- Azure Key Vault: ~$0.03/month (minimal operations)
 
 **Set Budget Alert**:
 ```bash

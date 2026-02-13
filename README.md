@@ -222,9 +222,9 @@ See `infra/README.md` for detailed setup instructions.
 
 | Resource | Type | Purpose |
 |----------|------|---------|
-| `wheelofdoom-swa` | Static Web App (Standard) | Hosts frontend + managed Functions backend |
-| `wheelodomstorage` | Storage Account | Azure Table Storage for entries and results |
-| `wheelofdoom-kv` | Key Vault (Standard) | Secure storage for connection strings and secrets |
+| `swa-wheelofdoom` | Static Web App (Standard) | Hosts frontend |
+| `func-wheelofdoom` | Function App (Flex Consumption) | Azure Functions backend (.NET 10) |
+| `stowheelofdoom` | Storage Account | Azure Table Storage for entries and results |
 | Entries | Table | Stores wheel entries |
 | Results | Table | Stores spin history |
 
@@ -235,31 +235,28 @@ See `infra/README.md` for detailed setup instructions.
 - All routes require authentication
 - Unauthenticated users redirected to `/.auth/login/aad`
 
-**App Settings** (automatically configured by deployment workflow):
-- `AAD_CLIENT_ID` - Azure AD application client ID (plaintext - not sensitive)
-- `AAD_CLIENT_SECRET` - References Key Vault secret (secure)
-- `AzureWebJobsStorage` - References Key Vault secret (secure)
-- `ConnectionStrings__tables` - References Key Vault secret (secure)
+**App Settings** (automatically configured by Bicep deployment):
 
-**Security**: Sensitive secrets are managed securely via Bicep Key Vault secret resources:
+Static Web App settings:
+- `AAD_CLIENT_ID` - Azure AD application client ID for authentication
+- `AAD_CLIENT_SECRET` - Azure AD application client secret
+- `FUNCTION_APP_URL` - Function App endpoint URL
+
+Function App settings:
+- `AzureWebJobsStorage` - Storage connection for Functions runtime
+- `DEPLOYMENT_STORAGE_CONNECTION_STRING` - For flex consumption deployment
+- `ConnectionStrings__tables` - Table Storage connection for application data
 
 **Automated Secret Management**:
-- **Storage connection string**: Bicep creates secret resource using `listKeys()` (safe - encrypted in Key Vault, not in outputs)
-- **AAD client secret**: GitHub Actions workflow stores from secrets into Key Vault
-- **App settings**: Use Key Vault reference syntax instead of plaintext:
-  ```
-  @Microsoft.KeyVault(VaultName=wheelofdoom-kv;SecretName=storage-connection-string)
-  ```
+- **Storage connection string**: Built using `listKeys()` in Bicep, configured directly in app settings
+- **AAD credentials**: Passed as `@secure()` parameters, stored directly in app settings
+- **Security**: Secrets never exposed in deployment outputs or history
+- **Platform encryption**: Azure encrypts all app settings at rest and in transit
 
-**Security Pattern**:
-- ✅ `listKeys()` in outputs = BAD (plaintext in deployment history)
-- ✅ `listKeys()` in secret resource = GOOD (encrypted in Key Vault)
-
-**Benefits**:
-- ✅ No secrets in Bicep outputs or deployment history
-- ✅ No secrets in plaintext in app settings
-- ✅ RBAC-controlled access to Key Vault
-- ✅ Audit logs for all secret access
+**Security Trade-offs**:
+- Secrets stored in app settings (Azure platform security) rather than Key Vault
+- No Key Vault audit logging for secret access
+- Secret rotation requires updating app settings directly
 
 **Key Insight**: Backend code works unchanged in both development (Aspire) and production (Azure) because `ConnectionStrings__tables` matches Aspire's expected configuration format.
 
@@ -267,9 +264,8 @@ See `infra/README.md` for detailed setup instructions.
 
 **Monthly**: $10-15
 - Azure Static Web Apps Standard: $9/month
-- Azure Functions: $0-1/month (within free tier)
+- Azure Functions (Flex Consumption): $0-1/month (within free tier)
 - Azure Storage: $1-5/month
-- Azure Key Vault: ~$0.03/month (minimal secret operations)
 
 ### Build Configuration
 

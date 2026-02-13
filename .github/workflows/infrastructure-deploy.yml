@@ -52,7 +52,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       static-web-app-name: ${{ steps.deploy-infra.outputs.staticWebAppName }}
-      key-vault-name: ${{ steps.deploy-infra.outputs.keyVaultName }}
       storage-account-name: ${{ steps.deploy-infra.outputs.storageAccountName }}
 
     steps:
@@ -84,7 +83,6 @@ jobs:
           echo "## Infrastructure Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Static Web App:** ${{ steps.deploy-infra.outputs.staticWebAppName }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Key Vault:** ${{ steps.deploy-infra.outputs.keyVaultName }}" >> $GITHUB_STEP_SUMMARY
           echo "**Storage Account:** ${{ steps.deploy-infra.outputs.storageAccountName }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Resource Group:** ${{ env.AZURE_RESOURCE_GROUP }}" >> $GITHUB_STEP_SUMMARY
@@ -109,14 +107,6 @@ jobs:
             --name ${{ needs.deploy-infrastructure.outputs.static-web-app-name }} \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --query "{name:name,status:properties.status,url:properties.defaultHostname}" \
-            --output table
-
-      - name: Verify Key Vault
-        run: |
-          echo "Verifying Key Vault secrets..."
-          az keyvault secret list \
-            --vault-name ${{ needs.deploy-infrastructure.outputs.key-vault-name }} \
-            --query "[].{name:name,enabled:attributes.enabled}" \
             --output table
 
       - name: Verify Storage Tables

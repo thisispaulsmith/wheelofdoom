@@ -21,9 +21,6 @@ param aadClientId string
 @description('Azure AD client secret for user authentication')
 param aadClientSecret string
 
-@description('GitHub Actions service principal object ID for Key Vault access')
-param githubActionsPrincipalId string
-
 @description('Name of the Function App')
 param functionAppName string
 
@@ -183,49 +180,29 @@ resource linkedBackend 'Microsoft.Web/staticSites/linkedBackends@2023-12-01' = {
   }
 }
 
+// Configure Static Web App settings with direct secret configuration
+// Secrets are passed as secure parameters and stored in Azure platform app settings
+// Note: These settings are encrypted at rest by Azure and transmitted securely
+resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
+  parent: staticWebApp
+  name: 'appsettings'
+  properties: {
+    AAD_CLIENT_ID: aadClientId
+    AAD_CLIENT_SECRET: aadClientSecret
+    FUNCTION_APP_URL: 'https://${functionApp.properties.defaultHostName}'
+  }
+  dependsOn: [
+    linkedBackend
+  ]
+}
 
-
-//// Grant GitHub Actions service principal Key Vault Secrets Officer role
-//// This allows the deployment pipeline to read/write secrets during deployment
-//resource githubActionsKeyVaultRole 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-//  name: guid(keyVault.id, githubActionsPrincipalId, 'KeyVaultSecretsOfficer')
-//  scope: keyVault
-//  properties: {
-//    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', 'b86a8fe4-44ce-4948-aee5-eccb2c155cd7')
-//    principalId: githubActionsPrincipalId
-//    principalType: 'ServicePrincipal'
-//  }
-//}
-//
-//// Configure Static Web App settings with Key Vault references
-//// Note: Static Web Apps can read Key Vault secrets via special Azure platform handling
-//// The @Microsoft.KeyVault syntax is resolved by Azure at runtime
-//resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
-//  parent: staticWebApp
-//  name: 'appsettings'
-//  properties: {
-//    AAD_CLIENT_ID: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=aad-client-id)'
-//    AAD_CLIENT_SECRET: '@Microsoft.KeyVault(VaultName=${keyVault.name};SecretName=aad-client-secret)'
-//    FUNCTION_APP_URL: 'https://${functionApp.properties.defaultHostName}'
-//  }
-//  dependsOn: [
-//    aadClientIdSecret
-//    aadClientSecretSecret
-//    githubActionsKeyVaultRole
-//    linkedBackend
-//  ]
-//}
-
-//// Outputs
-//output staticWebAppDefaultHostName string = staticWebApp.properties.defaultHostname
-//output staticWebAppId string = staticWebApp.id
-//output staticWebAppName string = staticWebApp.name
-//output functionAppName string = functionApp.name
-//output functionAppDefaultHostName string = functionApp.properties.defaultHostName
-//output functionAppId string = functionApp.id
-//output storageAccountName string = storageAccount.name
-//output storageAccountId string = storageAccount.id
-//output tableEndpoint string = storageAccount.properties.primaryEndpoints.table
-//output keyVaultName string = keyVault.name
-//output keyVaultUri string = keyVault.properties.vaultUri
-//output keyVaultId string = keyVault.id
+// Outputs
+output staticWebAppDefaultHostName string = staticWebApp.properties.defaultHostname
+output staticWebAppId string = staticWebApp.id
+output staticWebAppName string = staticWebApp.name
+output functionAppName string = functionApp.name
+output functionAppDefaultHostName string = functionApp.properties.defaultHostName
+output functionAppId string = functionApp.id
+output storageAccountName string = storageAccount.name
+output storageAccountId string = storageAccount.id
+output tableEndpoint string = storageAccount.properties.primaryEndpoints.table
