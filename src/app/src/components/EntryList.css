@@ -27,6 +27,14 @@
   text-align: center;
 }
 
+/* Loading wrapper - matches .entry-list-items height */
+.entry-list-loading-wrapper {
+  min-height: 300px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
 .entry-list-items {
   list-style: none;
   margin: 0;
@@ -34,6 +42,7 @@
   flex: 1;
   overflow-y: auto;
   max-height: 300px;
+  min-height: 300px; /* Prevent collapse */
 }
 
 .entry-item {

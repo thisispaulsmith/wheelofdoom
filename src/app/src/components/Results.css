@@ -13,7 +13,22 @@
   border-bottom: 1px solid #374151;
 }
 
-.results-loading,
+/* Loading wrapper - matches .results-list height */
+.results-loading-wrapper {
+  min-height: 200px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+/* Empty state wrapper - matches .results-list height */
+.results-empty-wrapper {
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .results-empty {
   color: #6B7280;
   text-align: center;
@@ -26,6 +41,7 @@
   margin: 0;
   padding: 0;
   max-height: 200px;
+  min-height: 200px; /* Prevent collapse */
   overflow-y: auto;
 }
 

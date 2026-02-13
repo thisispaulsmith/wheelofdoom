@@ -1,0 +1,69 @@
+/* Base skeleton styles */
+.skeleton-loader {
+  padding: 0;
+  margin: 0;
+}
+
+.skeleton-item {
+  background: #374151;
+  border-radius: 0.25rem;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 0.25rem;
+}
+
+/* Entry skeleton - matches .entry-item height */
+.skeleton-item-entry {
+  height: 42px;
+  padding: 0.5rem 0.75rem;
+}
+
+/* Result skeleton - matches .result-item height */
+.skeleton-item-result {
+  height: 50px;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #374151;
+}
+
+.skeleton-item-result:last-child {
+  border-bottom: none;
+}
+
+/* Shimmer animation */
+.skeleton-shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(55, 65, 81, 0) 0%,
+    rgba(75, 85, 99, 0.4) 50%,
+    rgba(55, 65, 81, 0) 100%
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Fade-in animation for content */
+.fade-in {
+  animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
