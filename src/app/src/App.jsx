@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Wheel } from './components/Wheel';
 import { EntryList } from './components/EntryList';
 import { Results } from './components/Results';
@@ -6,9 +6,15 @@ import { WinnerModal } from './components/WinnerModal';
 import { useEntries } from './hooks/useEntries';
 import { useResults } from './hooks/useResults';
 import { useSound } from './hooks/useSound';
+import { initializeTelemetry, trackEvent, trackException } from './utils/telemetry';
 import './App.css';
 
 function App() {
+  // Initialize telemetry once on app mount
+  useEffect(() => {
+    initializeTelemetry();
+  }, []);
+
   const { entries, loading: entriesLoading, addEntry, deleteEntry } = useEntries();
   const { results, loading: resultsLoading, saveResult } = useResults();
   const { playTick, playDrumroll, stopDrumroll, playFanfare } = useSound();
@@ -16,13 +22,17 @@ function App() {
   const [winner, setWinner] = useState(null);
   const [winnerMessage, setWinnerMessage] = useState('');
   const [isSpinning, setIsSpinning] = useState(false);
+  const [spinStartTime, setSpinStartTime] = useState(null);
 
   const handleSpinStart = () => {
     setIsSpinning(true);
+    setSpinStartTime(Date.now());
     playDrumroll();
   };
 
   const handleSpinComplete = async (selectedEntry, message) => {
+    const spinDuration = spinStartTime ? Date.now() - spinStartTime : null;
+
     setIsSpinning(false);
     stopDrumroll();
     playFanfare();
@@ -33,8 +43,16 @@ function App() {
     // Save result to backend
     try {
       await saveResult(selectedEntry.name);
+
+      trackEvent('WheelSpun', {
+        winner: selectedEntry.name,
+        totalEntries: entries.length,
+      }, {
+        spinDuration: spinDuration,
+      });
     } catch (err) {
       console.error('Failed to save result:', err);
+      trackException(err, 3, { operation: 'saveResult', winner: selectedEntry.name });
     }
   };
 

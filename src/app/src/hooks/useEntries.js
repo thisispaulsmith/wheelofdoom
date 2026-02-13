@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchEntries, addEntry as apiAddEntry, deleteEntry as apiDeleteEntry } from '../utils/api';
+import { trackEvent, trackException } from '../utils/telemetry';
 
 export function useEntries() {
   const [entries, setEntries] = useState([]);
@@ -24,21 +25,35 @@ export function useEntries() {
   }, [loadEntries]);
 
   const addEntry = async (name) => {
+    const startTime = Date.now();
     try {
       await apiAddEntry(name);
       await loadEntries();
+
+      trackEvent('EntryAdded', {
+        entryName: name,
+        duration: Date.now() - startTime,
+      });
     } catch (err) {
       setError(err.message);
+      trackException(err, 3, { operation: 'addEntry', entryName: name });
       throw err;
     }
   };
 
   const deleteEntry = async (name) => {
+    const startTime = Date.now();
     try {
       await apiDeleteEntry(name);
       await loadEntries();
+
+      trackEvent('EntryDeleted', {
+        entryName: name,
+        duration: Date.now() - startTime,
+      });
     } catch (err) {
       setError(err.message);
+      trackException(err, 3, { operation: 'deleteEntry', entryName: name });
       throw err;
     }
   };

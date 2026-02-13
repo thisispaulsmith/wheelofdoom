@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +10,7 @@ namespace WheelOfDoom.Api.Functions;
 
 public class EntriesFunction
 {
+    private static readonly ActivitySource ActivitySource = new("WheelOfDoom.Api");
     private readonly ILogger<EntriesFunction> _logger;
     private readonly ITableStorageService _tableStorage;
 
@@ -39,8 +41,12 @@ public class EntriesFunction
     public async Task<IActionResult> AddEntry(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "entries")] HttpRequest req)
     {
+        using var activity = ActivitySource.StartActivity("AddEntry");
+
         var user = GetUserIdentity(req);
         _logger.LogInformation("Adding entry by {User}", user);
+
+        activity?.SetTag("user.name", user);
 
         AddEntryRequest? body;
         try
@@ -57,7 +63,12 @@ public class EntriesFunction
             return new BadRequestObjectResult(new { error = "Name is required" });
         }
 
+        activity?.SetTag("entry.name", body.Name.Trim());
+
         var entry = await _tableStorage.AddEntryAsync(body.Name.Trim(), user);
+
+        activity?.SetTag("entry.added", true);
+        _logger.LogInformation("Entry added: {EntryName} by {User}", entry.RowKey, user);
 
         return new CreatedResult($"/api/entries/{entry.RowKey}", new
         {
