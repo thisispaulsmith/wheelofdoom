@@ -226,14 +226,13 @@ resource linkedBackend 'Microsoft.Web/staticSites/linkedBackends@2023-12-01' = {
 // Configure Static Web App settings with direct secret configuration
 // Secrets are passed as secure parameters and stored in Azure platform app settings
 // Note: These settings are encrypted at rest by Azure and transmitted securely
+// Only AAD credentials are needed - routing handled by linkedBackend
 resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
   parent: staticWebApp
   name: 'appsettings'
   properties: {
     AAD_CLIENT_ID: aadClientId
     AAD_CLIENT_SECRET: aadClientSecret
-    FUNCTION_APP_URL: 'https://${functionApp.properties.defaultHostName}'
-    APPLICATIONINSIGHTS_CONNECTION_STRING: appInsights.properties.ConnectionString
   }
   dependsOn: [
     linkedBackend
