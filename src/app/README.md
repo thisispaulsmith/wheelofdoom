@@ -28,16 +28,21 @@ src/app/
 │   ├── components/          # React components
 │   │   ├── Wheel.jsx       # Animated spinning wheel (Canvas)
 │   │   ├── EntryList.jsx   # Manage wheel entries
-│   │   ├── HistoryTabs.jsx # Statistics and history display
-│   │   ├── WinnerModal.jsx # Winner announcement
-│   │   └── UserProfile.jsx # User profile photo display
+│   │   ├── HistoryTabs.jsx # Tabbed container (Statistics + Results)
+│   │   ├── Statistics.jsx  # Bar chart visualization of spin counts
+│   │   ├── Results.jsx     # Recent spin results list
+│   │   ├── WinnerModal.jsx # Winner announcement modal
+│   │   ├── UserProfile.jsx # User profile photo display
+│   │   └── SkeletonLoader.jsx # Loading skeleton with shimmer effect
 │   ├── hooks/              # Custom React hooks
 │   │   ├── useEntries.js   # Entry CRUD operations
 │   │   ├── useResults.js   # Spin history management
+│   │   ├── useStatistics.js # Aggregate results into statistics
 │   │   ├── useSound.js     # Web Audio synthesis
 │   │   └── useAuth.js      # User authentication state
 │   ├── utils/              # Utility functions
 │   │   ├── api.js          # API client (fetch wrappers)
+│   │   ├── colors.js       # Shared color palette and color assignment
 │   │   └── telemetry.js    # Application Insights integration
 │   ├── App.jsx             # Main application component
 │   ├── App.css             # Application styles
@@ -102,14 +107,42 @@ Entry management with optimistic UI updates:
 
 ### HistoryTabs.jsx
 
-Statistics display with tabbed interface:
-- **Recent Results**: Last 50 spin results with timestamps
-- **Statistics**: Pie chart showing cumulative spin counts per person
+Tabbed container for statistics and results:
+- **Two Tabs**: Statistics and Recent Results
+- **Active State**: Maintains selected tab state
 - **Responsive**: Adapts to mobile and desktop layouts
+- **Child Components**: Contains Statistics.jsx and Results.jsx
+
+### Statistics.jsx
+
+Bar chart visualization of spin statistics:
+- **Aggregation**: Uses useStatistics hook to count selections
+- **Bar Chart**: Horizontal bars showing relative frequencies
+- **Color Coding**: Consistent colors per person (via colors.js)
+- **Percentages**: Displays count and percentage for each person
+- **Sorting**: Ordered by count (descending), then name (ascending)
+
+### Results.jsx
+
+Recent spin results list:
+- **Display Limit**: Shows last 50 results
+- **Relative Time**: Timestamps like "2 mins ago", "3 hours ago"
+- **Real-time Updates**: Automatically updates when new spins occur
+- **Loading State**: Shows skeleton loader during fetch
+
+### SkeletonLoader.jsx
+
+Loading skeleton UI component:
+- **Shimmer Effect**: Animated gradient for visual feedback
+- **Types**: Configurable for different content types (entry, result)
+- **Count**: Renders multiple skeleton items
+- **Reusable**: Used by EntryList, Results, and Statistics
 
 ## API Integration
 
-All API calls are centralized in `src/utils/api.js`:
+### API Client (`src/utils/api.js`)
+
+All API calls are centralized:
 
 ```javascript
 // Entries
@@ -128,6 +161,35 @@ export async function fetchUserInfo()
 API utilities use relative paths (`/api/*`) which are:
 - **Development**: Proxied to `http://localhost:7071` by Vite
 - **Production**: Routed to Azure Functions by Azure Static Web Apps
+
+### Custom Hooks
+
+**Data Fetching**:
+- `useEntries()` - Manages wheel entries with add/delete operations
+- `useResults()` - Manages spin results with save operation
+- `useAuth()` - Fetches and caches user authentication state
+
+**Data Transformation**:
+- `useStatistics(results)` - Aggregates results into statistics with counts and percentages
+- `useSound()` - Provides Web Audio API sound synthesis functions
+
+### Utilities
+
+**colors.js** - Shared color palette:
+```javascript
+// 10-color palette for consistent visual identity
+export const COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', ...]
+
+// Deterministic color assignment (same name = same color)
+export function getColorForName(name)
+```
+
+Used by both Wheel.jsx (canvas rendering) and Statistics.jsx (bar charts) to ensure color consistency.
+
+**telemetry.js** - Application Insights integration:
+- Event tracking (wheel spins, entry management)
+- Exception tracking
+- Custom metrics
 
 ## Authentication
 
@@ -241,16 +303,24 @@ Frontend tests use Vitest + React Testing Library:
 test/app/
 ├── components/          # Component tests
 │   ├── EntryList.test.jsx
-│   ├── HistoryTabs.test.jsx
-│   └── Wheel.test.jsx
+│   ├── Results.test.jsx
+│   ├── Wheel.test.jsx
+│   └── WinnerModal.test.jsx
 ├── hooks/              # Hook tests
-│   ├── useEntries.test.js
-│   └── useResults.test.js
+│   └── useSound.test.js
 └── utils/              # Utility tests
     └── api.test.js
 ```
 
 **Test Coverage**: 53 unit and component tests
+
+**Key Test Files**:
+- `EntryList.test.jsx` - Entry management interactions
+- `Results.test.jsx` - Results list rendering and time formatting
+- `Wheel.test.jsx` - Canvas rendering and spin mechanics
+- `WinnerModal.test.jsx` - Modal display and confetti
+- `useSound.test.js` - Web Audio API synthesis
+- `api.test.js` - API client fetch wrappers
 
 ## Performance
 
