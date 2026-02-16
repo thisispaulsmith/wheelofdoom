@@ -180,6 +180,10 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       DEPLOYMENT_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
       ConnectionStrings__tables: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
       APPLICATIONINSIGHTS_CONNECTION_STRING: appInsights.properties.ConnectionString
+      // Azure AD credentials for Microsoft Graph API access
+      AZURE_TENANT_ID: tenantId
+      AZURE_CLIENT_ID: aadClientId
+      AZURE_CLIENT_SECRET: aadClientSecret
     }
   }
 }
