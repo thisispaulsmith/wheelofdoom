@@ -1,0 +1,42 @@
+.user-profile {
+  display: flex;
+  align-items: center;
+  margin-right: 1rem;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: all 0.15s ease;
+  border: 2px solid transparent;
+  object-fit: cover;
+}
+
+.user-avatar:hover {
+  border-color: #374151;
+  transform: scale(1.05);
+}
+
+.user-avatar-anonymous {
+  background-color: #374151;
+  color: #9CA3AF;
+}
+
+.user-avatar-loading {
+  background-color: #374151;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
