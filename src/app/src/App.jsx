@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Wheel } from './components/Wheel';
 import { EntryList } from './components/EntryList';
-import { Results } from './components/Results';
+import { HistoryTabs } from './components/HistoryTabs';
 import { WinnerModal } from './components/WinnerModal';
 import { useEntries } from './hooks/useEntries';
 import { useResults } from './hooks/useResults';
@@ -89,7 +89,7 @@ function App() {
             onAdd={addEntry}
             onDelete={deleteEntry}
           />
-          <Results results={results} loading={resultsLoading} />
+          <HistoryTabs results={results} loading={resultsLoading} />
         </aside>
       </main>
 

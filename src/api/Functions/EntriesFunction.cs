@@ -63,9 +63,16 @@ public class EntriesFunction
             return new BadRequestObjectResult(new { error = "Name is required" });
         }
 
-        activity?.SetTag("entry.name", body.Name.Trim());
+        var trimmedName = body.Name.Trim();
 
-        var entry = await _tableStorage.AddEntryAsync(body.Name.Trim(), user);
+        if (trimmedName.Length > 40)
+        {
+            return new BadRequestObjectResult(new { error = "Name must be 40 characters or less" });
+        }
+
+        activity?.SetTag("entry.name", trimmedName);
+
+        var entry = await _tableStorage.AddEntryAsync(trimmedName, user);
 
         activity?.SetTag("entry.added", true);
         _logger.LogInformation("Entry added: {EntryName} by {User}", entry.RowKey, user);

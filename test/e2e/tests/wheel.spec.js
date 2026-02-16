@@ -168,7 +168,14 @@ test.describe('Wheel of Doom - Empty State', () => {
     await expect(page.getByText('No entries yet. Add some names!')).toBeVisible();
   });
 
-  test('shows empty results message', async ({ page }) => {
+  test('shows empty statistics message', async ({ page }) => {
+    // Statistics tab is default, should show statistics empty state
+    await expect(page.getByText('No statistics yet. Spin the wheel to collect data!')).toBeVisible();
+  });
+
+  test('shows empty results message when Results tab is clicked', async ({ page }) => {
+    // Click on Recent Results tab
+    await page.getByRole('tab', { name: 'Recent Results' }).click();
     await expect(page.getByText('No spins yet. Give it a whirl!')).toBeVisible();
   });
 

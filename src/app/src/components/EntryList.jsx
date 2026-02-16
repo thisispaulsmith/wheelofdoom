@@ -67,6 +67,7 @@ export function EntryList({ entries, onAdd, onDelete, loading }) {
           placeholder="Enter a name..."
           className="entry-input"
           disabled={isAdding}
+          maxLength={40}
         />
         <button type="submit" className="entry-add-btn" disabled={isAdding || !newName.trim()}>
           {isAdding ? '...' : 'Add'}
