@@ -189,7 +189,10 @@ export function Wheel({ entries, onSpinComplete, onTick, disabled }) {
         onClick={spin}
         className={`wheel-canvas ${isSpinning ? 'spinning' : ''} ${disabled ? 'disabled' : ''}`}
       />
-      <div className="wheel-prompt">
+      <div
+        className={`wheel-prompt ${!isSpinning && entries.length > 0 && !disabled ? 'clickable' : ''}`}
+        onClick={spin}
+      >
         {!isSpinning && entries.length > 0 ? 'Click to spin!' : '\u00A0'}
       </div>
     </div>

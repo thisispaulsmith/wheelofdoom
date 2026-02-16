@@ -31,6 +31,15 @@
   animation: pulse 2s infinite;
 }
 
+.wheel-prompt.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.wheel-prompt.clickable:hover {
+  color: #F9FAFB;
+}
+
 @keyframes pulse {
   0%, 100% {
     opacity: 1;

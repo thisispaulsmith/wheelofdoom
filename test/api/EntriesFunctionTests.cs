@@ -145,4 +145,41 @@ public class EntriesFunctionTests
         // Assert
         _tableStorageMock.Verify(x => x.AddEntryAsync("Charlie", "testuser@example.com"), Times.Once);
     }
+
+    [Fact]
+    public async Task AddEntry_ReturnsBadRequestWhenNameIsTooLong()
+    {
+        // Arrange
+        var longName = new string('a', 41); // 41 characters, exceeds 40 char limit
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Body = new MemoryStream(System.Text.Encoding.UTF8.GetBytes($"{{\"name\":\"{longName}\"}}"));
+        httpContext.Request.ContentType = "application/json";
+
+        // Act
+        var result = await _function.AddEntry(httpContext.Request);
+
+        // Assert
+        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.NotNull(badRequestResult.Value);
+    }
+
+    [Fact]
+    public async Task AddEntry_AcceptsNameAtMaxLength()
+    {
+        // Arrange
+        var maxLengthName = new string('a', 40); // Exactly 40 characters
+        var entry = new Entry { RowKey = maxLengthName, AddedBy = "anonymous" };
+        _tableStorageMock.Setup(x => x.AddEntryAsync(maxLengthName, It.IsAny<string>())).ReturnsAsync(entry);
+
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Body = new MemoryStream(System.Text.Encoding.UTF8.GetBytes($"{{\"name\":\"{maxLengthName}\"}}"));
+        httpContext.Request.ContentType = "application/json";
+
+        // Act
+        var result = await _function.AddEntry(httpContext.Request);
+
+        // Assert
+        Assert.IsType<CreatedResult>(result);
+        _tableStorageMock.Verify(x => x.AddEntryAsync(maxLengthName, It.IsAny<string>()), Times.Once);
+    }
 }
