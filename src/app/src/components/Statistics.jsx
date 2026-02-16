@@ -1,20 +1,7 @@
 import { useStatistics } from '../hooks/useStatistics';
+import { getColorForName } from '../utils/colors';
 import { SkeletonLoader } from './SkeletonLoader';
 import './Statistics.css';
-
-// Import colors from Wheel.jsx for consistency
-const COLORS = [
-  '#FF6B6B', // Red
-  '#4ECDC4', // Teal
-  '#45B7D1', // Blue
-  '#96CEB4', // Green
-  '#FFEAA7', // Yellow
-  '#DDA0DD', // Plum
-  '#98D8C8', // Mint
-  '#F7DC6F', // Gold
-  '#BB8FCE', // Purple
-  '#85C1E9', // Light Blue
-];
 
 export function Statistics({ results, loading }) {
   const stats = useStatistics(results);
@@ -36,9 +23,9 @@ export function Statistics({ results, loading }) {
         </div>
       ) : (
         <ul className="statistics-list fade-in">
-          {stats.map((stat, index) => {
+          {stats.map((stat) => {
             const barWidth = (stat.count / maxCount) * 100;
-            const color = COLORS[index % COLORS.length];
+            const color = getColorForName(stat.name);
 
             return (
               <li key={stat.name} className="stat-item">

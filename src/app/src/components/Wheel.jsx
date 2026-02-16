@@ -1,18 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
+import { getColorForName } from '../utils/colors';
 import './Wheel.css';
-
-const COLORS = [
-  '#FF6B6B', // Red
-  '#4ECDC4', // Teal
-  '#45B7D1', // Blue
-  '#96CEB4', // Green
-  '#FFEAA7', // Yellow
-  '#DDA0DD', // Plum
-  '#98D8C8', // Mint
-  '#F7DC6F', // Gold
-  '#BB8FCE', // Purple
-  '#85C1E9', // Light Blue
-];
 
 const DRAMATIC_MESSAGES = [
   "The Wheel has spoken!",
@@ -69,7 +57,7 @@ export function Wheel({ entries, onSpinComplete, onTick, disabled }) {
       ctx.moveTo(centerX, centerY);
       ctx.arc(centerX, centerY, radius, startAngle, endAngle);
       ctx.closePath();
-      ctx.fillStyle = COLORS[index % COLORS.length];
+      ctx.fillStyle = getColorForName(entry.name);
       ctx.fill();
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;

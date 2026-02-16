@@ -25,10 +25,14 @@ export function useResults() {
 
   const saveResult = async (name) => {
     try {
+      // Optimistically add to local state
       const result = await apiSaveResult(name);
-      await loadResults();
+      setResults(prev => [result, ...prev]);
+      setError(null);
       return result;
     } catch (err) {
+      // On error, refetch to ensure consistency
+      await loadResults();
       setError(err.message);
       throw err;
     }

@@ -27,14 +27,18 @@ export function useEntries() {
   const addEntry = async (name) => {
     const startTime = Date.now();
     try {
-      await apiAddEntry(name);
-      await loadEntries();
+      // Optimistically add to local state
+      const newEntry = await apiAddEntry(name);
+      setEntries(prev => [...prev, newEntry].sort((a, b) => a.name.localeCompare(b.name)));
+      setError(null);
 
       trackEvent('EntryAdded', {
         entryName: name,
         duration: Date.now() - startTime,
       });
     } catch (err) {
+      // On error, refetch to ensure consistency
+      await loadEntries();
       setError(err.message);
       trackException(err, 3, { operation: 'addEntry', entryName: name });
       throw err;
@@ -44,14 +48,18 @@ export function useEntries() {
   const deleteEntry = async (name) => {
     const startTime = Date.now();
     try {
+      // Optimistically remove from local state
       await apiDeleteEntry(name);
-      await loadEntries();
+      setEntries(prev => prev.filter(entry => entry.name !== name));
+      setError(null);
 
       trackEvent('EntryDeleted', {
         entryName: name,
         duration: Date.now() - startTime,
       });
     } catch (err) {
+      // On error, refetch to ensure consistency
+      await loadEntries();
       setError(err.message);
       trackException(err, 3, { operation: 'deleteEntry', entryName: name });
       throw err;
