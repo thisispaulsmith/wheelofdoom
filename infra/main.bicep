@@ -1,3 +1,40 @@
+// ==================================================================================
+// Wheel of Doom - Infrastructure as Code
+// ==================================================================================
+//
+// KNOWN WHAT-IF BEHAVIOR:
+// The 'az deployment group what-if' command will show some changes even when
+// resources haven't changed. This is expected behavior:
+//
+// 1. Application Insights (Flow_Type, Request_Source):
+//    - These are service-managed properties set by Azure
+//    - Cannot be controlled via Bicep
+//    - Safe to ignore
+//
+// 2. Function App Settings (shown as additions with + sign):
+//    - What-if cannot evaluate listKeys() at plan time
+//    - Settings appear as "new" even though they exist and won't change
+//    - This is a known Bicep limitation (https://aka.ms/WhatIfIssues)
+//    - Safe to ignore if values are correct
+//
+// 3. Static Web App (deploymentAuthPolicy, stableInboundIP, trafficSplitting):
+//    - Service-managed properties not included in template
+//    - Azure manages these automatically
+//    - Shown as "removed" but won't actually be deleted
+//    - Safe to ignore
+//
+// 4. Function App deployment.storage.value:
+//    - Shows expression syntax vs evaluated value
+//    - Values are identical after evaluation
+//    - Safe to ignore
+//
+// 5. Linked Backend (managedServiceIdentityType):
+//    - Service-managed property
+//    - Safe to ignore
+//
+// Real changes will show different values or significantly different structure.
+// ==================================================================================
+
 @description('Location for all resources')
 param location string = resourceGroup().location
 
@@ -85,12 +122,17 @@ resource storageAccount 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   resource blobServices 'blobServices' = {
     name: 'default'
     properties: {
-      deleteRetentionPolicy: {}
+      deleteRetentionPolicy: {
+        enabled: false
+        allowPermanentDelete: false
+      }
     }
     resource deploymentContainer 'containers' = {
       name: deploymentStorageContainerName
       properties: {
         publicAccess: 'None'
+        defaultEncryptionScope: '$account-encryption-key'
+        denyEncryptionScopeOverride: false
       }
     }
   }
@@ -148,6 +190,8 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
     siteConfig: {
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
+      netFrameworkVersion: 'v4.6'
+      localMySqlEnabled: false
     }
     
     functionAppConfig: {
@@ -180,6 +224,10 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
       DEPLOYMENT_STORAGE_CONNECTION_STRING: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
       ConnectionStrings__tables: 'DefaultEndpointsProtocol=https;AccountName=${storageAccountName};AccountKey=${storageKey};EndpointSuffix=${environment().suffixes.storage}'
       APPLICATIONINSIGHTS_CONNECTION_STRING: appInsights.properties.ConnectionString
+      // Azure AD credentials for Microsoft Graph API access
+      AZURE_TENANT_ID: tenantId
+      AZURE_CLIENT_ID: aadClientId
+      AZURE_CLIENT_SECRET: aadClientSecret
     }
   }
 }
@@ -195,10 +243,6 @@ resource staticWebApp 'Microsoft.Web/staticSites@2023-12-01' = {
   properties: {
     repositoryUrl: 'https://github.com/thisispaulsmith/wheelofdoom'
     branch: 'master'
-    buildProperties: {
-      appLocation: 'src/app'
-      outputLocation: 'dist'
-    }
     stagingEnvironmentPolicy: 'Enabled'
     allowConfigFileUpdates: true
     provider: 'GitHub'
@@ -222,14 +266,13 @@ resource linkedBackend 'Microsoft.Web/staticSites/linkedBackends@2023-12-01' = {
 // Configure Static Web App settings with direct secret configuration
 // Secrets are passed as secure parameters and stored in Azure platform app settings
 // Note: These settings are encrypted at rest by Azure and transmitted securely
+// Only AAD credentials are needed - routing handled by linkedBackend
 resource swaAppSettings 'Microsoft.Web/staticSites/config@2023-12-01' = {
   parent: staticWebApp
   name: 'appsettings'
   properties: {
     AAD_CLIENT_ID: aadClientId
     AAD_CLIENT_SECRET: aadClientSecret
-    FUNCTION_APP_URL: 'https://${functionApp.properties.defaultHostName}'
-    APPLICATIONINSIGHTS_CONNECTION_STRING: appInsights.properties.ConnectionString
   }
   dependsOn: [
     linkedBackend

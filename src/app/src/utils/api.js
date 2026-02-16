@@ -51,3 +51,12 @@ export async function saveResult(name) {
   }
   return response.json();
 }
+
+export async function fetchUserInfo() {
+  const response = await fetch('/.auth/me');
+  if (!response.ok) {
+    throw new Error('Not authenticated');
+  }
+  const data = await response.json();
+  return data.clientPrincipal; // Azure SWA wraps user in clientPrincipal
+}

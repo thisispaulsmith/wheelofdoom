@@ -266,11 +266,13 @@ Infrastructure workflows use the same service principal configured in GitHub Sec
    - `AzureWebJobsStorage` - Storage connection for Functions runtime
    - `DEPLOYMENT_STORAGE_CONNECTION_STRING` - For flex consumption deployment
    - `ConnectionStrings__tables` - Table Storage for application data
+   - `AZURE_TENANT_ID` - Azure AD tenant ID for Microsoft Graph API access
+   - `AZURE_CLIENT_ID` - Azure AD client ID for Microsoft Graph API access
+   - `AZURE_CLIENT_SECRET` - Azure AD client secret for Microsoft Graph API access
 
 4. **Static Web App Settings** - Configured with direct secrets:
    - `AAD_CLIENT_ID` - Azure AD client ID for user authentication
    - `AAD_CLIENT_SECRET` - Azure AD client secret
-   - `FUNCTION_APP_URL` - Function App endpoint
 
 **Verify Configuration:**
 ```bash
@@ -300,15 +302,23 @@ az functionapp config appsettings list \
 
 **Important**: `ConnectionStrings__tables` matches Aspire's expected configuration format, allowing the backend code to work unchanged in both development (Aspire) and production (Azure Static Web Apps).
 
-### 2. Configure Azure AD Redirect URI
+### 2. Configure Azure AD App Registration
 
-After deployment, update your Azure AD app registration:
-1. Go to Azure Portal → Azure Active Directory → App registrations
-2. Select your app (e.g., "WheelOfDoom-Auth")
-3. Go to Authentication → Add redirect URI
-4. Type: Web
-5. URI: `https://<static-web-app-name>.azurestaticapps.net/.auth/login/aad/callback`
-6. Save
+The application requires an Azure AD app registration with Microsoft Graph API permissions.
+
+**Required Setup**:
+1. Create Azure AD app registration (if not exists)
+2. Configure API permissions: `User.Read.All` (Application permission)
+3. Grant admin consent for Microsoft Graph API
+4. Create client secret
+5. Configure redirect URI: `https://<static-web-app-name>.azurestaticapps.net/.auth/login/aad/callback`
+
+**Detailed Instructions**: See the "Azure AD App Registration Setup" section in the main [README.md](../README.md#azure-ad-app-registration-setup) for step-by-step instructions.
+
+**Why This Is Needed**:
+- User authentication via Azure AD (configured in `staticwebapp.config.json`)
+- User profile photo fetching via Microsoft Graph API (backend Function)
+- The Function App uses application permissions to fetch photos on behalf of authenticated users
 
 ## Deployment Outputs
 

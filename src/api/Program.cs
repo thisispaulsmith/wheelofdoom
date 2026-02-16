@@ -14,6 +14,9 @@ builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights();
 
+// Register HttpClient for Graph API calls
+builder.Services.AddHttpClient();
+
 // Use Aspire client integration
 builder.AddAzureTableServiceClient("tables");
 
