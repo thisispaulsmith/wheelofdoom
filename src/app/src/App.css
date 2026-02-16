@@ -8,6 +8,9 @@
   padding: 1rem 2rem;
   background: #1F2937;
   border-bottom: 1px solid #374151;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .app-title {
@@ -15,6 +18,24 @@
   font-size: 1.5rem;
   font-weight: 700;
   color: #F9FAFB;
+}
+
+.github-link {
+  color: #9CA3AF;
+  transition: color 0.15s ease;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  padding: 0.25rem;
+}
+
+.github-link:hover {
+  color: #F9FAFB;
+}
+
+.github-icon {
+  width: 24px;
+  height: 24px;
 }
 
 .app-main {
