@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { SkeletonLoader } from './SkeletonLoader';
 import './EntryList.css';
 
 export function EntryList({ entries, onAdd, onDelete, loading }) {
   const [newName, setNewName] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const inputRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,6 +19,7 @@ export function EntryList({ entries, onAdd, onDelete, loading }) {
       console.error('Failed to add entry:', err);
     } finally {
       setIsAdding(false);
+      inputRef.current?.focus();
     }
   };
 
@@ -61,6 +63,7 @@ export function EntryList({ entries, onAdd, onDelete, loading }) {
 
       <form onSubmit={handleSubmit} className="entry-form">
         <input
+          ref={inputRef}
           type="text"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
