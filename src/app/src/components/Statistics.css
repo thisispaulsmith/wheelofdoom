@@ -15,6 +15,7 @@
 
 /* Loading wrapper - matches .statistics-list height */
 .statistics-loading-wrapper {
+  min-height: 200px;
   max-height: 200px;
   overflow-y: auto;
   padding: 0.25rem 0;
