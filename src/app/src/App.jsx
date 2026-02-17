@@ -71,7 +71,53 @@ function App() {
     <ThemeProvider>
       <div className="app">
         <header className="app-header">
-          <h1 className="app-title">Wheel of Doom</h1>
+          <h1 className="app-title">
+            <svg
+              className="app-logo"
+              width="40"
+              height="40"
+              viewBox="0 0 40 40"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              {/* Wheel background circle */}
+              <circle
+                cx="20"
+                cy="20"
+                r="17"
+                fill="currentColor"
+                opacity="0.1"
+              />
+
+              {/* Wheel spokes (8 segments) */}
+              <path
+                d="M20 3 L20 37 M3 20 L37 20 M8 8 L32 32 M32 8 L8 32"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                opacity="0.4"
+              />
+
+              {/* Outer wheel ring */}
+              <circle
+                cx="20"
+                cy="20"
+                r="17"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+              />
+
+              {/* Lightning bolt - extends beyond wheel */}
+              <path
+                d="M26 0 L12 19 L18 19 L14 40 L32 15 L24 15 Z"
+                fill="#FFD700"
+                stroke="#FFA500"
+                strokeWidth="0.5"
+              />
+            </svg>
+            <span className="app-title-text">Wheel of Doom</span>
+          </h1>
           <div className="app-header-right">
             <a
               href="https://github.com/thisispaulsmith/wheelofdoom"
