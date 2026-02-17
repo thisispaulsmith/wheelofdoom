@@ -24,6 +24,9 @@ local.settings.json
 # SWA CLI
 .swa/
 
+# Aspire
+.aspire/
+
 # Environment files
 .env
 .env.local

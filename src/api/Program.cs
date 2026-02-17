@@ -10,10 +10,6 @@ builder.AddServiceDefaults();
 
 builder.ConfigureFunctionsWebApplication();
 
-builder.Services
-    .AddApplicationInsightsTelemetryWorkerService()
-    .ConfigureFunctionsApplicationInsights();
-
 // Register HttpClient for Graph API calls
 builder.Services.AddHttpClient();
 
