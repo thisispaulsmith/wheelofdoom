@@ -14,8 +14,8 @@ function getAudioContext() {
   return audioContext;
 }
 
-// Generate a short tick/click sound
-function createTick() {
+// Generate a short tick/click sound with variable pitch based on speed
+function createTick(speed = 1.0) {
   const ctx = getAudioContext();
   const oscillator = ctx.createOscillator();
   const gainNode = ctx.createGain();
@@ -23,14 +23,70 @@ function createTick() {
   oscillator.connect(gainNode);
   gainNode.connect(ctx.destination);
 
-  oscillator.frequency.value = 1200;
+  // Frequency varies with speed: slower = lower pitch (400Hz), faster = higher pitch (2000Hz)
+  const frequency = 400 + (speed * 1600);
+  oscillator.frequency.value = frequency;
   oscillator.type = 'square';
 
-  gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+  gainNode.gain.setValueAtTime(0.15, ctx.currentTime);
   gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.05);
 
   oscillator.start(ctx.currentTime);
   oscillator.stop(ctx.currentTime + 0.05);
+}
+
+// Generate countdown beep sound
+function createCountdownBeep(beepNumber) {
+  const ctx = getAudioContext();
+  const oscillator = ctx.createOscillator();
+  const gainNode = ctx.createGain();
+
+  oscillator.connect(gainNode);
+  gainNode.connect(ctx.destination);
+
+  // Higher pitched beeps: 1500Hz, 1700Hz, 1900Hz (increasing tension)
+  const frequency = 1500 + (beepNumber * 200);
+  oscillator.frequency.value = frequency;
+  oscillator.type = 'sine';
+
+  gainNode.gain.setValueAtTime(0.25, ctx.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+
+  oscillator.start(ctx.currentTime);
+  oscillator.stop(ctx.currentTime + 0.15);
+}
+
+// Generate heartbeat sound
+function createHeartbeat() {
+  const ctx = getAudioContext();
+
+  const playBeat = (time) => {
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    oscillator.frequency.value = 60; // Deep bass
+    oscillator.type = 'sine';
+
+    gainNode.gain.setValueAtTime(0, time);
+    gainNode.gain.linearRampToValueAtTime(0.3, time + 0.05);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+
+    oscillator.start(time);
+    oscillator.stop(time + 0.2);
+  };
+
+  // Two beats (ba-dum) repeating every 1.2 seconds
+  const beatInterval = 1.2;
+  const totalBeats = 8; // ~10 seconds worth
+
+  for (let i = 0; i < totalBeats; i++) {
+    const time = ctx.currentTime + (i * beatInterval);
+    playBeat(time); // First beat
+    playBeat(time + 0.3); // Second beat (ba-dum)
+  }
 }
 
 // Generate a drumroll sound (rapid repeating hits)
@@ -126,9 +182,9 @@ function createFanfare() {
 export function useSound() {
   const drumrollRef = useRef(null);
 
-  const playTick = useCallback(() => {
+  const playTick = useCallback((speed = 1.0) => {
     try {
-      createTick();
+      createTick(speed);
     } catch (e) {
       console.warn('Could not play tick sound:', e);
     }
@@ -155,5 +211,26 @@ export function useSound() {
     }
   }, []);
 
-  return { playTick, playDrumroll, stopDrumroll, playFanfare };
+  const playCountdownBeep = useCallback((beepNumber) => {
+    try {
+      createCountdownBeep(beepNumber);
+    } catch (e) {
+      console.warn('Could not play countdown beep:', e);
+    }
+  }, []);
+
+  const playHeartbeat = useCallback(() => {
+    try {
+      createHeartbeat();
+    } catch (e) {
+      console.warn('Could not play heartbeat:', e);
+    }
+  }, []);
+
+  const stopHeartbeat = useCallback(() => {
+    // Heartbeat stops naturally after scheduled beats complete
+    // No explicit stop needed due to scheduled oscillators
+  }, []);
+
+  return { playTick, playDrumroll, stopDrumroll, playFanfare, playCountdownBeep, playHeartbeat, stopHeartbeat };
 }

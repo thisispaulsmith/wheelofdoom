@@ -14,10 +14,14 @@ const DRAMATIC_MESSAGES = [
   "Fortune favors...",
 ];
 
-export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
+export function Wheel({ entries, loading, onSpinStart, onSpinComplete, onTick, onCountdownBeep, disabled }) {
   const canvasRef = useRef(null);
   const [rotation, setRotation] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [hasPlayedBeep1, setHasPlayedBeep1] = useState(false);
+  const [hasPlayedBeep2, setHasPlayedBeep2] = useState(false);
+  const [hasPlayedBeep3, setHasPlayedBeep3] = useState(false);
   const animationRef = useRef(null);
   const { wheelPalette } = useTheme();
 
@@ -27,7 +31,7 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
       .getPropertyValue(varName).trim();
   };
 
-  const drawWheel = useCallback((ctx, currentRotation, isLoading) => {
+  const drawWheel = useCallback((ctx, currentRotation, isLoading, isSpinning, progress) => {
     const canvas = ctx.canvas;
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
@@ -108,7 +112,18 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
     ctx.lineWidth = 3;
     ctx.stroke();
 
-    // Draw pointer (on right side)
+    // Draw pointer with glow effect during spin
+    ctx.save();
+
+    // Add glow effect when spinning
+    if (isSpinning) {
+      const glowIntensity = progress > 0.8 ? (1 - (progress - 0.8) / 0.2) : 1;
+      ctx.shadowColor = '#FFD700'; // Gold glow
+      ctx.shadowBlur = 15 * glowIntensity;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    }
+
     ctx.beginPath();
     ctx.moveTo(canvas.width - 10, centerY);
     ctx.lineTo(canvas.width - 40, centerY - 15);
@@ -119,20 +134,28 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
     ctx.strokeStyle = getThemeColor('--wheel-segment-border');
     ctx.lineWidth = 2;
     ctx.stroke();
+
+    ctx.restore();
   }, [entries, loading, wheelPalette]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    drawWheel(ctx, rotation, loading);
-  }, [rotation, loading, drawWheel, wheelPalette]);
+    drawWheel(ctx, rotation, loading, isSpinning, progress);
+  }, [rotation, loading, isSpinning, progress, drawWheel, wheelPalette]);
 
   const spin = useCallback(() => {
     if (isSpinning || entries.length === 0 || disabled) return;
 
     setIsSpinning(true);
+    setHasPlayedBeep1(false);
+    setHasPlayedBeep2(false);
+    setHasPlayedBeep3(false);
 
-    const spinDuration = 5000 + Math.random() * 2000; // 5-7 seconds
+    // Notify parent that spin has started
+    if (onSpinStart) onSpinStart();
+
+    const spinDuration = 7000 + Math.random() * 3000; // 7-10 seconds
     const totalRotation = rotation + (Math.PI * 2 * (5 + Math.random() * 5)); // 5-10 full rotations
     const startTime = Date.now();
     const startRotation = rotation;
@@ -141,12 +164,25 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
 
     const animate = () => {
       const elapsed = Date.now() - startTime;
-      const progress = Math.min(elapsed / spinDuration, 1);
+      const currentProgress = Math.min(elapsed / spinDuration, 1);
+      setProgress(currentProgress);
 
-      // Easing function for dramatic slowdown
-      const easeOut = 1 - Math.pow(1 - progress, 4);
-      const currentRotation = startRotation + (totalRotation - startRotation) * easeOut;
+      // Easing function for dramatic slowdown - exponential curve power 6
+      const easeOut = 1 - Math.pow(1 - currentProgress, 6);
 
+      // Add final wobble effect in last 10% of spin
+      let finalRotation = startRotation + (totalRotation - startRotation) * easeOut;
+
+      if (currentProgress > 0.9) {
+        // Oscillating wobble that decreases as we approach 100%
+        const wobbleProgress = (currentProgress - 0.9) / 0.1; // 0-1 range for final 10%
+        const wobbleFrequency = 3; // Number of wobbles
+        const wobbleAmplitude = 0.1 * (1 - wobbleProgress); // Decreases to 0
+        const wobble = Math.sin(wobbleProgress * Math.PI * wobbleFrequency) * wobbleAmplitude;
+        finalRotation += wobble;
+      }
+
+      const currentRotation = finalRotation;
       setRotation(currentRotation);
 
       // Calculate current segment for tick sound
@@ -156,13 +192,36 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
 
       if (currentSegment !== lastTickSegment) {
         lastTickSegment = currentSegment;
-        if (onTick) onTick();
+        const currentSpeed = 1 - easeOut; // Speed from 1.0 (fast) to 0 (stopped)
+        if (onTick) onTick(currentSpeed);
       }
 
-      if (progress < 1) {
+      // Trigger countdown beeps at 90%, 95%, 98%
+      if (currentProgress >= 0.90 && !hasPlayedBeep1) {
+        if (onCountdownBeep) onCountdownBeep(1);
+        setHasPlayedBeep1(true);
+      }
+      if (currentProgress >= 0.95 && !hasPlayedBeep2) {
+        if (onCountdownBeep) onCountdownBeep(2);
+        setHasPlayedBeep2(true);
+      }
+      if (currentProgress >= 0.98 && !hasPlayedBeep3) {
+        if (onCountdownBeep) onCountdownBeep(3);
+        setHasPlayedBeep3(true);
+      }
+
+      if (currentProgress < 1) {
         animationRef.current = requestAnimationFrame(animate);
       } else {
         setIsSpinning(false);
+
+        // Add shake class
+        if (canvasRef.current) {
+          canvasRef.current.classList.add('shake');
+          setTimeout(() => {
+            canvasRef.current?.classList.remove('shake');
+          }, 500);
+        }
 
         // Determine winner (segment at the pointer, which is on the right = angle 0)
         const finalRotation = ((currentRotation % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -180,7 +239,7 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
     };
 
     animationRef.current = requestAnimationFrame(animate);
-  }, [isSpinning, entries, disabled, rotation, onSpinComplete, onTick]);
+  }, [isSpinning, entries, disabled, rotation, onSpinStart, onSpinComplete, onTick, onCountdownBeep]);
 
   // Keyboard support
   useEffect(() => {
@@ -200,7 +259,7 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
         width={500}
         height={500}
         onClick={spin}
-        className={`wheel-canvas ${isSpinning ? 'spinning' : ''} ${disabled ? 'disabled' : ''} ${loading ? 'loading' : ''}`}
+        className={`wheel-canvas ${isSpinning ? (progress < 0.7 ? 'spinning spinning-fast' : 'spinning spinning-slow') : ''} ${disabled ? 'disabled' : ''} ${loading ? 'loading' : ''}`}
       />
       <div
         className={`wheel-prompt ${!isSpinning && entries.length > 0 && !disabled && !loading ? 'clickable' : ''}`}
