@@ -45,5 +45,6 @@
 }
 
 .tabs-content {
-  /* No padding - child components handle their own spacing */
+  /* Fixed height to prevent layout shift during loading */
+  min-height: 280px;
 }
