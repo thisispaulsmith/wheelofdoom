@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { getColorForName } from '../utils/colors';
+import { useTheme } from '../hooks/useTheme';
 import './Wheel.css';
 
 const DRAMATIC_MESSAGES = [
@@ -18,6 +19,13 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
   const [rotation, setRotation] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const animationRef = useRef(null);
+  const { wheelPalette } = useTheme();
+
+  // Helper to get theme colors from CSS variables
+  const getThemeColor = (varName) => {
+    return getComputedStyle(document.documentElement)
+      .getPropertyValue(varName).trim();
+  };
 
   const drawWheel = useCallback((ctx, currentRotation, isLoading) => {
     const canvas = ctx.canvas;
@@ -32,13 +40,13 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
       // Draw loading wheel
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-      ctx.fillStyle = '#374151';
+      ctx.fillStyle = getThemeColor('--wheel-bg');
       ctx.fill();
-      ctx.strokeStyle = '#4B5563';
+      ctx.strokeStyle = getThemeColor('--wheel-stroke-dark');
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      ctx.fillStyle = '#9CA3AF';
+      ctx.fillStyle = getThemeColor('--wheel-text-light');
       ctx.font = '20px Arial';
       ctx.textAlign = 'center';
       ctx.fillText('Loading...', centerX, centerY);
@@ -49,13 +57,13 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
       // Draw empty wheel
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-      ctx.fillStyle = '#374151';
+      ctx.fillStyle = getThemeColor('--wheel-bg');
       ctx.fill();
-      ctx.strokeStyle = '#4B5563';
+      ctx.strokeStyle = getThemeColor('--wheel-stroke-dark');
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      ctx.fillStyle = '#9CA3AF';
+      ctx.fillStyle = getThemeColor('--wheel-text-light');
       ctx.font = '20px Arial';
       ctx.textAlign = 'center';
       ctx.fillText('Add names to spin!', centerX, centerY);
@@ -74,9 +82,9 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
       ctx.moveTo(centerX, centerY);
       ctx.arc(centerX, centerY, radius, startAngle, endAngle);
       ctx.closePath();
-      ctx.fillStyle = getColorForName(entry.name);
+      ctx.fillStyle = getColorForName(entry.name, wheelPalette);
       ctx.fill();
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = getThemeColor('--wheel-segment-border');
       ctx.lineWidth = 2;
       ctx.stroke();
 
@@ -85,7 +93,7 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
       ctx.translate(centerX, centerY);
       ctx.rotate(startAngle + sliceAngle / 2);
       ctx.textAlign = 'right';
-      ctx.fillStyle = '#1F2937';
+      ctx.fillStyle = getThemeColor('--wheel-segment-text');
       ctx.font = `bold ${Math.min(18, 200 / entries.length)}px Arial`;
       ctx.fillText(entry.name, radius - 20, 5);
       ctx.restore();
@@ -94,9 +102,9 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
     // Draw center circle
     ctx.beginPath();
     ctx.arc(centerX, centerY, 30, 0, 2 * Math.PI);
-    ctx.fillStyle = '#1F2937';
+    ctx.fillStyle = getThemeColor('--wheel-center');
     ctx.fill();
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = getThemeColor('--wheel-segment-border');
     ctx.lineWidth = 3;
     ctx.stroke();
 
@@ -106,18 +114,18 @@ export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
     ctx.lineTo(canvas.width - 40, centerY - 15);
     ctx.lineTo(canvas.width - 40, centerY + 15);
     ctx.closePath();
-    ctx.fillStyle = '#1F2937';
+    ctx.fillStyle = getThemeColor('--wheel-center');
     ctx.fill();
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = getThemeColor('--wheel-segment-border');
     ctx.lineWidth = 2;
     ctx.stroke();
-  }, [entries, loading]);
+  }, [entries, loading, wheelPalette]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     drawWheel(ctx, rotation, loading);
-  }, [rotation, loading, drawWheel]);
+  }, [rotation, loading, drawWheel, wheelPalette]);
 
   const spin = useCallback(() => {
     if (isSpinning || entries.length === 0 || disabled) return;

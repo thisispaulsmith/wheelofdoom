@@ -1,5 +1,5 @@
 .history-tabs {
-  background: #1F2937;
+  background: var(--bg-secondary);
   border-radius: 0.5rem;
   overflow: hidden;
 }
@@ -8,15 +8,15 @@
   display: flex;
   gap: 0.5rem;
   padding: 0.75rem 1rem 0 1rem;
-  border-bottom: 1px solid #374151;
-  background: #1F2937;
+  border-bottom: 1px solid var(--bg-tertiary);
+  background: var(--bg-secondary);
 }
 
 .tab-button {
   background: none;
   border: none;
   padding: 0.5rem 1rem;
-  color: #9CA3AF;
+  color: var(--text-secondary);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -28,20 +28,20 @@
 }
 
 .tab-button:hover {
-  background: #374151;
-  color: #F9FAFB;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 .tab-button:focus-visible {
-  outline: 2px solid #3B82F6;
+  outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
 
 .tab-button.active {
-  background: #374151;
-  color: #F9FAFB;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   font-weight: 600;
-  border-bottom-color: #3B82F6;
+  border-bottom-color: var(--accent-primary);
 }
 
 .tabs-content {

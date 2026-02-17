@@ -1,5 +1,5 @@
 .statistics {
-  background: #1F2937;
+  background: var(--bg-secondary);
   border-radius: 0.5rem;
   padding: 1rem;
 }
@@ -7,10 +7,10 @@
 .statistics-header {
   font-size: 1rem;
   font-weight: 600;
-  color: #F9FAFB;
+  color: var(--text-primary);
   margin: 0 0 0.75rem 0;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid #374151;
+  border-bottom: 1px solid var(--bg-tertiary);
 }
 
 /* Loading wrapper - matches .statistics-list height */
@@ -30,7 +30,7 @@
 }
 
 .statistics-empty {
-  color: #6B7280;
+  color: var(--text-tertiary);
   text-align: center;
   padding: 1rem;
   font-size: 0.875rem;
@@ -54,7 +54,7 @@
 }
 
 .stat-name {
-  color: #F9FAFB;
+  color: var(--text-primary);
   font-weight: 500;
   min-width: 100px;
   max-width: 100px;
@@ -67,7 +67,7 @@
 .stat-bar-container {
   flex-grow: 1;
   height: 24px;
-  background: #374151;
+  background: var(--bg-tertiary);
   border-radius: 4px;
   overflow: hidden;
   position: relative;
@@ -81,7 +81,7 @@
 }
 
 .stat-count {
-  color: #9CA3AF;
+  color: var(--text-secondary);
   font-weight: 600;
   font-size: 0.875rem;
   font-variant-numeric: tabular-nums;

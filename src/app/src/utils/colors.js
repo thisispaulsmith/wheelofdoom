@@ -1,24 +1,18 @@
-// Shared color palette for wheel and statistics
-export const COLORS = [
-  '#FF6B6B', // Red
-  '#4ECDC4', // Teal
-  '#45B7D1', // Blue
-  '#96CEB4', // Green
-  '#FFEAA7', // Yellow
-  '#DDA0DD', // Plum
-  '#98D8C8', // Mint
-  '#F7DC6F', // Gold
-  '#BB8FCE', // Purple
-  '#85C1E9', // Light Blue
-];
+import { WHEEL_PALETTES } from './wheelPalettes';
+
+// Shared color palette for wheel and statistics (backwards compatibility)
+export const COLORS = WHEEL_PALETTES.classic.colors;
 
 /**
  * Get a consistent color for a given name.
  * Uses a simple hash function to ensure the same name always gets the same color.
  * @param {string} name - The name to get a color for
+ * @param {string} palette - The palette to use (classic, pastel, vibrant, neon)
  * @returns {string} - Hex color code
  */
-export function getColorForName(name) {
+export function getColorForName(name, palette = 'classic') {
+  const colors = WHEEL_PALETTES[palette]?.colors || WHEEL_PALETTES.classic.colors;
+
   // Simple hash function for string
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
@@ -27,6 +21,6 @@ export function getColorForName(name) {
   }
 
   // Get color index (ensure positive)
-  const index = Math.abs(hash) % COLORS.length;
-  return COLORS[index];
+  const index = Math.abs(hash) % colors.length;
+  return colors[index];
 }

@@ -5,7 +5,7 @@
 }
 
 .skeleton-item {
-  background: #374151;
+  background: var(--bg-tertiary);
   border-radius: 0.25rem;
   position: relative;
   overflow: hidden;
@@ -22,7 +22,7 @@
 .skeleton-item-result {
   height: 50px;
   padding: 0.5rem 0;
-  border-bottom: 1px solid #374151;
+  border-bottom: 1px solid var(--bg-tertiary);
 }
 
 .skeleton-item-result:last-child {
@@ -38,9 +38,9 @@
   bottom: 0;
   background: linear-gradient(
     90deg,
-    rgba(55, 65, 81, 0) 0%,
-    rgba(75, 85, 99, 0.4) 50%,
-    rgba(55, 65, 81, 0) 100%
+    color-mix(in srgb, var(--bg-tertiary) 0%, transparent) 0%,
+    color-mix(in srgb, var(--bg-hover) 40%, transparent) 50%,
+    color-mix(in srgb, var(--bg-tertiary) 0%, transparent) 100%
   );
   animation: shimmer 1.5s infinite;
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { Wheel } from '../../../src/app/src/components/Wheel';
+import { ThemeProvider } from '../../../src/app/src/contexts/ThemeContext';
 
 describe('Wheel', () => {
   const mockEntries = [
@@ -10,31 +11,31 @@ describe('Wheel', () => {
   ];
 
   it('renders empty state when no entries', () => {
-    render(<Wheel entries={[]} />);
+    render(<ThemeProvider><Wheel entries={[]} /></ThemeProvider>);
     const canvas = document.querySelector('canvas');
     expect(canvas).toBeInTheDocument();
   });
 
   it('renders canvas element', () => {
-    render(<Wheel entries={mockEntries} />);
+    render(<ThemeProvider><Wheel entries={mockEntries} /></ThemeProvider>);
     const canvas = document.querySelector('canvas');
     expect(canvas).toBeInTheDocument();
   });
 
   it('shows click to spin prompt when not spinning', () => {
-    render(<Wheel entries={mockEntries} />);
+    render(<ThemeProvider><Wheel entries={mockEntries} /></ThemeProvider>);
     expect(screen.getByText('Click to spin!')).toBeInTheDocument();
   });
 
   it('does not show prompt when disabled', () => {
-    render(<Wheel entries={mockEntries} disabled={true} />);
+    render(<ThemeProvider><Wheel entries={mockEntries} disabled={true} /></ThemeProvider>);
     expect(screen.queryByText('Click to spin!')).toBeInTheDocument();
   });
 
   it('calls onTick during spin', async () => {
     vi.useFakeTimers();
     const onTick = vi.fn();
-    render(<Wheel entries={mockEntries} onTick={onTick} />);
+    render(<ThemeProvider><Wheel entries={mockEntries} onTick={onTick} /></ThemeProvider>);
 
     const canvas = document.querySelector('canvas');
     fireEvent.click(canvas);
@@ -51,7 +52,7 @@ describe('Wheel', () => {
   it('calls onSpinComplete when spin finishes', async () => {
     vi.useFakeTimers();
     const onSpinComplete = vi.fn();
-    render(<Wheel entries={mockEntries} onSpinComplete={onSpinComplete} />);
+    render(<ThemeProvider><Wheel entries={mockEntries} onSpinComplete={onSpinComplete} /></ThemeProvider>);
 
     const canvas = document.querySelector('canvas');
     fireEvent.click(canvas);
@@ -69,7 +70,7 @@ describe('Wheel', () => {
 
   it('does not spin when disabled', () => {
     const onSpinComplete = vi.fn();
-    render(<Wheel entries={mockEntries} onSpinComplete={onSpinComplete} disabled={true} />);
+    render(<ThemeProvider><Wheel entries={mockEntries} onSpinComplete={onSpinComplete} disabled={true} /></ThemeProvider>);
 
     const canvas = document.querySelector('canvas');
     fireEvent.click(canvas);
@@ -79,7 +80,7 @@ describe('Wheel', () => {
 
   it('does not spin when no entries', () => {
     const onSpinComplete = vi.fn();
-    render(<Wheel entries={[]} onSpinComplete={onSpinComplete} />);
+    render(<ThemeProvider><Wheel entries={[]} onSpinComplete={onSpinComplete} /></ThemeProvider>);
 
     const canvas = document.querySelector('canvas');
     fireEvent.click(canvas);

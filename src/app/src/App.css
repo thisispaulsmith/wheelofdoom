@@ -1,13 +1,13 @@
 .app {
   min-height: 100vh;
-  background: #111827;
-  color: #F9FAFB;
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 .app-header {
   padding: 1rem 2rem;
-  background: #1F2937;
-  border-bottom: 1px solid #374151;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -17,11 +17,11 @@
   margin: 0;
   font-size: 1.5rem;
   font-weight: 700;
-  color: #F9FAFB;
+  color: var(--text-primary);
 }
 
 .github-link {
-  color: #9CA3AF;
+  color: var(--text-secondary);
   transition: color 0.15s ease;
   display: flex;
   align-items: center;
@@ -30,7 +30,7 @@
 }
 
 .github-link:hover {
-  color: #F9FAFB;
+  color: var(--text-primary);
 }
 
 .app-header-right {

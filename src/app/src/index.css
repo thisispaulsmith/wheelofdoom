@@ -7,14 +7,58 @@
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: dark;
-  color: #F9FAFB;
-  background-color: #111827;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Dark theme (default) */
+  --bg-primary: #111827;
+  --bg-secondary: #1F2937;
+  --bg-tertiary: #374151;
+  --bg-hover: #4B5563;
+  --text-primary: #F9FAFB;
+  --text-secondary: #9CA3AF;
+  --text-tertiary: #6B7280;
+  --border-color: #374151;
+  --accent-primary: #3B82F6;
+  --accent-hover: #2563EB;
+  --error-color: #EF4444;
+
+  /* Wheel-specific */
+  --wheel-bg: #374151;
+  --wheel-stroke-dark: #4B5563;
+  --wheel-text-light: #9CA3AF;
+  --wheel-center: #1F2937;
+  --wheel-segment-border: #ffffff;
+  --wheel-segment-text: #1F2937;
+
+  color-scheme: dark;
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+}
+
+:root[data-theme="light"] {
+  /* Light theme */
+  --bg-primary: #F9FAFB;
+  --bg-secondary: #FFFFFF;
+  --bg-tertiary: #F3F4F6;
+  --bg-hover: #E5E7EB;
+  --text-primary: #111827;
+  --text-secondary: #6B7280;
+  --text-tertiary: #9CA3AF;
+  --border-color: #E5E7EB;
+  /* Accent colors stay the same */
+
+  /* Wheel-specific */
+  --wheel-bg: #F3F4F6;
+  --wheel-stroke-dark: #D1D5DB;
+  --wheel-text-light: #6B7280;
+  --wheel-center: #FFFFFF;
+  --wheel-segment-border: #ffffff;
+  --wheel-segment-text: #ffffff;
+
+  color-scheme: light;
 }
 
 body {

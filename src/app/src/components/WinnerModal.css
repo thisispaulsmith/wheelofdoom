@@ -45,13 +45,13 @@
 }
 
 .winner-modal {
-  background: linear-gradient(135deg, #1F2937 0%, #374151 100%);
+  background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
   border-radius: 1rem;
   padding: 3rem;
   text-align: center;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
   animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  border: 2px solid #4B5563;
+  border: 2px solid var(--bg-hover);
   z-index: 101;
 }
 
@@ -68,7 +68,7 @@
 
 .winner-message {
   font-size: 1.25rem;
-  color: #9CA3AF;
+  color: var(--text-secondary);
   margin-bottom: 1rem;
   font-style: italic;
 }
@@ -76,7 +76,7 @@
 .winner-name {
   font-size: 3rem;
   font-weight: 700;
-  color: #F9FAFB;
+  color: var(--text-primary);
   margin-bottom: 2rem;
   text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
   animation: glow 2s ease-in-out infinite alternate;
@@ -93,7 +93,7 @@
 
 .winner-close-btn {
   padding: 0.75rem 2rem;
-  background: #3B82F6;
+  background: var(--accent-primary);
   color: white;
   border: none;
   border-radius: 0.5rem;
@@ -104,6 +104,6 @@
 }
 
 .winner-close-btn:hover {
-  background: #2563EB;
+  background: var(--accent-hover);
   transform: translateY(-2px);
 }
