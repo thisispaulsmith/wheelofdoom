@@ -98,6 +98,8 @@ docker run -p 10000:10000 -p 10001:10001 -p 10002:10002 mcr.microsoft.com/azure-
 ```
 ├── WheelOfDoom.slnx           # .NET solution file
 ├── staticwebapp.config.json   # Azure Static Web Apps config
+├── CLAUDE.md                  # Project instructions for Claude Code
+├── infra/                     # Azure infrastructure (Bicep)
 ├── src/
 │   ├── app/                   # React frontend (Vite)
 │   ├── api/                   # .NET 10 Azure Functions
@@ -240,7 +242,6 @@ See `infra/README.md` for detailed setup instructions.
 Static Web App settings:
 - `AAD_CLIENT_ID` - Azure AD application client ID for authentication
 - `AAD_CLIENT_SECRET` - Azure AD application client secret
-- `FUNCTION_APP_URL` - Function App endpoint URL
 
 Function App settings:
 - `AzureWebJobsStorage` - Storage connection for Functions runtime
@@ -263,58 +264,18 @@ Function App settings:
 
 **Key Insight**: Backend code works unchanged in both development (Aspire) and production (Azure) because `ConnectionStrings__tables` matches Aspire's expected configuration format.
 
-### Azure AD App Registration Setup
+### Azure AD App Registration
 
-The application requires an Azure AD app registration with Microsoft Graph API permissions to fetch user profile photos.
+Requires Azure AD app registration with Microsoft Graph API permissions (`User.Read.All`) for user profile photos.
 
-**Step 1: Create App Registration** (if not already created):
-1. Go to Azure Portal → Azure Active Directory → App registrations
-2. Click "New registration"
-3. Name: `WheelOfDoom-Auth` (or your preferred name)
-4. Supported account types: Single tenant
-5. Click "Register"
+**Quick Setup**:
+1. Create app registration in Azure Portal
+2. Add `User.Read.All` application permission and grant admin consent
+3. Create client secret
+4. Configure redirect URI: `https://[your-swa].azurestaticapps.net/.auth/login/aad/callback`
+5. Add `AAD_CLIENT_ID` and `AAD_CLIENT_SECRET` to GitHub secrets
 
-**Step 2: Create Client Secret**:
-1. In your app registration, go to Certificates & secrets
-2. Click "New client secret"
-3. Add a description (e.g., "WheelOfDoom Production")
-4. Choose expiration period
-5. Click "Add"
-6. **Important**: Copy the secret value immediately (it won't be shown again)
-7. Save as `AAD_CLIENT_SECRET` in GitHub secrets
-
-**Step 3: Configure API Permissions**:
-1. In your app registration, go to API permissions
-2. Click "Add a permission"
-3. Select "Microsoft Graph" → "Application permissions"
-4. Search for and select `User.Read.All`
-5. Click "Add permissions"
-6. Click "Grant admin consent" (requires Azure AD administrator role)
-7. Verify the status shows "Granted" with a green checkmark
-
-**Step 4: Configure Redirect URIs** (after Static Web App is deployed):
-1. In your app registration, go to Authentication
-2. Click "Add a platform" → "Web"
-3. Add redirect URIs:
-   - `https://swa-wheelofdoom.azurestaticapps.net/.auth/login/aad/callback` (default Azure domain)
-   - `https://your-custom-domain.com/.auth/login/aad/callback` (if using custom domain)
-4. Click "Configure"
-
-**Step 5: Update Configuration**:
-1. Copy the Application (client) ID from app registration overview
-2. Copy the Directory (tenant) ID from app registration overview
-3. Add to GitHub secrets:
-   - `AAD_CLIENT_ID` - Application (client) ID
-   - `AAD_CLIENT_SECRET` - Client secret (from Step 2)
-4. Update `staticwebapp.config.json` line 6 with your tenant ID if not already set
-
-**Required Permissions Summary**:
-- **Permission**: `User.Read.All` (Application permission)
-- **Type**: Application permissions (not delegated)
-- **Why**: Allows the backend to fetch user profile photos via Microsoft Graph API
-- **Admin Consent**: Required (must be granted by Azure AD administrator)
-
-**Security Note**: The backend uses application permissions (client credentials flow) because Azure Static Web Apps doesn't expose user access tokens to backend Functions. The backend validates the authenticated user identity via the `X-MS-CLIENT-PRINCIPAL-NAME` header and only fetches that user's photo, enforcing least privilege.
+See `infra/README.md` for detailed step-by-step instructions.
 
 ### Cost Estimate
 
