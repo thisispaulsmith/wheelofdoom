@@ -57,6 +57,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  min-height: 550px; /* Prevents layout shift during load */
 }
 
 .sidebar {
@@ -64,6 +65,7 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  min-height: 550px; /* Prevents layout shift during load */
 }
 
 /* Responsive layout */
