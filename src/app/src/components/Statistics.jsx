@@ -1,10 +1,12 @@
 import { useStatistics } from '../hooks/useStatistics';
 import { getColorForName } from '../utils/colors';
+import { useTheme } from '../hooks/useTheme';
 import { SkeletonLoader } from './SkeletonLoader';
 import './Statistics.css';
 
 export function Statistics({ results, loading }) {
   const stats = useStatistics(results);
+  const { wheelPalette } = useTheme();
 
   // Find max count for normalization (highest count gets 100% bar width)
   const maxCount = stats.length > 0 ? stats[0].count : 1;
@@ -25,7 +27,7 @@ export function Statistics({ results, loading }) {
         <ul className="statistics-list fade-in">
           {stats.map((stat) => {
             const barWidth = (stat.count / maxCount) * 100;
-            const color = getColorForName(stat.name);
+            const color = getColorForName(stat.name, wheelPalette);
 
             return (
               <li key={stat.name} className="stat-item">

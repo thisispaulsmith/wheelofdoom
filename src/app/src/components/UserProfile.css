@@ -2,6 +2,8 @@
   display: flex;
   align-items: center;
   margin-left: 1rem;
+  position: relative;
+  cursor: pointer;
 }
 
 .user-avatar {
@@ -18,17 +20,17 @@
 }
 
 .user-avatar:hover {
-  border-color: #374151;
+  border-color: var(--border-color);
   transform: scale(1.05);
 }
 
 .user-avatar-anonymous {
-  background-color: #374151;
-  color: #9CA3AF;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
 }
 
 .user-avatar-loading {
-  background-color: #374151;
+  background-color: var(--bg-tertiary);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
