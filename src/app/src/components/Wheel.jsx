@@ -13,13 +13,13 @@ const DRAMATIC_MESSAGES = [
   "Fortune favors...",
 ];
 
-export function Wheel({ entries, onSpinComplete, onTick, disabled }) {
+export function Wheel({ entries, loading, onSpinComplete, onTick, disabled }) {
   const canvasRef = useRef(null);
   const [rotation, setRotation] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const animationRef = useRef(null);
 
-  const drawWheel = useCallback((ctx, currentRotation) => {
+  const drawWheel = useCallback((ctx, currentRotation, isLoading) => {
     const canvas = ctx.canvas;
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
@@ -27,6 +27,23 @@ export function Wheel({ entries, onSpinComplete, onTick, disabled }) {
 
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (isLoading) {
+      // Draw loading wheel
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+      ctx.fillStyle = '#374151';
+      ctx.fill();
+      ctx.strokeStyle = '#4B5563';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.fillStyle = '#9CA3AF';
+      ctx.font = '20px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Loading...', centerX, centerY);
+      return;
+    }
 
     if (entries.length === 0) {
       // Draw empty wheel
@@ -94,13 +111,13 @@ export function Wheel({ entries, onSpinComplete, onTick, disabled }) {
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
     ctx.stroke();
-  }, [entries]);
+  }, [entries, loading]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    drawWheel(ctx, rotation);
-  }, [rotation, drawWheel]);
+    drawWheel(ctx, rotation, loading);
+  }, [rotation, loading, drawWheel]);
 
   const spin = useCallback(() => {
     if (isSpinning || entries.length === 0 || disabled) return;
@@ -175,13 +192,13 @@ export function Wheel({ entries, onSpinComplete, onTick, disabled }) {
         width={500}
         height={500}
         onClick={spin}
-        className={`wheel-canvas ${isSpinning ? 'spinning' : ''} ${disabled ? 'disabled' : ''}`}
+        className={`wheel-canvas ${isSpinning ? 'spinning' : ''} ${disabled ? 'disabled' : ''} ${loading ? 'loading' : ''}`}
       />
       <div
-        className={`wheel-prompt ${!isSpinning && entries.length > 0 && !disabled ? 'clickable' : ''}`}
+        className={`wheel-prompt ${!isSpinning && entries.length > 0 && !disabled && !loading ? 'clickable' : ''}`}
         onClick={spin}
       >
-        {!isSpinning && entries.length > 0 ? 'Click to spin!' : '\u00A0'}
+        {loading ? '\u00A0' : (!isSpinning && entries.length > 0 ? 'Click to spin!' : '\u00A0')}
       </div>
     </div>
   );

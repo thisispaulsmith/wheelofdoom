@@ -97,6 +97,7 @@ function App() {
         <div className="wheel-section">
           <Wheel
             entries={entries}
+            loading={entriesLoading}
             onSpinStart={handleSpinStart}
             onSpinComplete={handleSpinComplete}
             onTick={handleTick}

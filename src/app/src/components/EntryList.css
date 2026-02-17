@@ -18,6 +18,9 @@
 .entry-count {
   color: #9CA3AF;
   font-weight: normal;
+  display: inline-block;
+  min-width: 2.5rem;
+  text-align: left;
 }
 
 .entry-list-loading {
@@ -28,6 +31,7 @@
 
 /* Loading wrapper - matches .entry-list-items height */
 .entry-list-loading-wrapper {
+  min-height: 300px;
   max-height: 300px;
   overflow-y: auto;
   padding: 0.25rem 0;
@@ -39,6 +43,7 @@
   padding: 0;
   flex: 1;
   overflow-y: auto;
+  min-height: 300px;
   max-height: 300px;
 }
 

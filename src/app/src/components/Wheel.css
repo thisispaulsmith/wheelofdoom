@@ -24,6 +24,20 @@
   opacity: 0.7;
 }
 
+.wheel-canvas.loading {
+  cursor: wait;
+  animation: loadingPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes loadingPulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 .wheel-prompt {
   margin-top: 1rem;
   font-size: 1.25rem;
