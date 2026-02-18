@@ -19,7 +19,7 @@ function App() {
 
   const { entries, loading: entriesLoading, addEntry, deleteEntry } = useEntries();
   const { results, loading: resultsLoading, saveResult } = useResults();
-  const { playTick, playDrumroll, stopDrumroll, playFanfare } = useSound();
+  const { playTick, playDrumroll, stopDrumroll, playFanfare, playCountdownBeep, playHeartbeat, stopHeartbeat } = useSound();
 
   const [winner, setWinner] = useState(null);
   const [winnerMessage, setWinnerMessage] = useState('');
@@ -30,6 +30,7 @@ function App() {
     setIsSpinning(true);
     setSpinStartTime(Date.now());
     playDrumroll();
+    playHeartbeat(); // Add deep bass heartbeat layer
   };
 
   const handleSpinComplete = async (selectedEntry, message) => {
@@ -37,6 +38,7 @@ function App() {
 
     setIsSpinning(false);
     stopDrumroll();
+    stopHeartbeat(); // Stop heartbeat when spin completes
     playFanfare();
 
     setWinner(selectedEntry);
@@ -58,8 +60,12 @@ function App() {
     }
   };
 
-  const handleTick = () => {
-    playTick();
+  const handleTick = (speed) => {
+    playTick(speed);
+  };
+
+  const handleCountdownBeep = (beepNumber) => {
+    playCountdownBeep(beepNumber);
   };
 
   const handleCloseWinner = () => {
@@ -149,6 +155,7 @@ function App() {
               onSpinStart={handleSpinStart}
               onSpinComplete={handleSpinComplete}
               onTick={handleTick}
+              onCountdownBeep={handleCountdownBeep}
               disabled={entriesLoading || entries.length === 0}
             />
           </div>

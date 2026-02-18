@@ -51,14 +51,15 @@ describe('Wheel', () => {
 
   it('calls onSpinComplete when spin finishes', async () => {
     vi.useFakeTimers();
+    const onSpinStart = vi.fn();
     const onSpinComplete = vi.fn();
-    render(<ThemeProvider><Wheel entries={mockEntries} onSpinComplete={onSpinComplete} /></ThemeProvider>);
+    render(<ThemeProvider><Wheel entries={mockEntries} onSpinStart={onSpinStart} onSpinComplete={onSpinComplete} /></ThemeProvider>);
 
     const canvas = document.querySelector('canvas');
     fireEvent.click(canvas);
 
-    // Advance past spin duration (5-7 seconds)
-    vi.advanceTimersByTime(8000);
+    // Advance past spin duration (7-10 seconds) plus shake animation (0.5 seconds)
+    vi.advanceTimersByTime(11000);
 
     expect(onSpinComplete).toHaveBeenCalledWith(
       expect.objectContaining({ name: expect.any(String) }),
