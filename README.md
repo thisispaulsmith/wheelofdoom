@@ -16,6 +16,12 @@ A fun spinning wheel web app for random team task assignment. Built with React, 
 The easiest way to run the full stack locally is with .NET Aspire:
 
 ```bash
+# Install frontend dependencies (first time or after branch switch)
+cd src/app
+npm install
+cd ../..
+
+# Start the full stack
 cd src/AppHost
 dotnet run
 ```
@@ -114,6 +120,8 @@ docker run -p 10000:10000 -p 10001:10001 -p 10002:10002 mcr.microsoft.com/azure-
 ## Testing
 
 **All tests run from the root directory** (not from src/app/).
+
+**Important**: Frontend tests require `src/app/node_modules` to be installed. If you haven't already, run `npm install` in `src/app` before running tests.
 
 ### Frontend Tests (Vitest)
 
